@@ -10,4 +10,4 @@ V-Motrix is a VOS download manager backed by aria2-next, with HTTP/HTTPS, SFTP, 
 - The default download path is always displayed as `/downloads`, which maps to the current user's isolated subdirectory under the shared download root.
 - Browser local storage and IndexedDB switch to a separate partition when the VOS account changes.
 
-VOS App Storage manages application state. Downloaded files are mapped through `VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH`, defaulting to `/data/vos_workspace/v-motrix/downloads`; the app still separates users below that root with opaque VOS user hashes so files can be retrieved directly from VOS file management.
+VOS App Storage manages application state. Downloaded files are mapped through `VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH`, defaulting to `/data/vos_workspace/v-motrix/downloads`; the app still separates users below that directory with opaque VOS user hashes so files can be retrieved directly from VOS file management.

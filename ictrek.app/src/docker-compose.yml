@@ -15,7 +15,7 @@ x-v-motrix-base: &v-motrix-base
     VOS_APP_VERSION: "__APP_VERSION__"
   volumes:
     - ${VOS_APP_STORAGE_PATH}:/data
-    - ${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix}/downloads:/downloads
+    - ${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix/downloads}:/downloads
   labels:
     - "traefik.enable=true"
     - "traefik.docker.network=vos_default"
