@@ -120,7 +120,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    spreadsheet = os.environ.get("FEISHU_SPREADSHEET_TOKEN", DEFAULT_SPREADSHEET)
+    spreadsheet = os.environ.get("FEISHU_SPREADSHEET_TOKEN", "").strip() or DEFAULT_SPREADSHEET
     app_id, secret = load_credentials()
     auth = request_json(
         "POST",
