@@ -94,6 +94,12 @@ Copyright (C) 2006, 2019 Tatsuhiro Tsujikawa
 Enabled Features: Async DNS, BitTorrent, Firefox3 Cookie, GZip, HTTPS, Message Digest, Metalink, XML-RPC
 `
 
+const ARIA2_NEXT_OUTPUT = `Aria2 Next version 2.6.8
+Maintained since 2026 by AnInsomniacy for Motrix Next and standalone users.
+
+Enabled Features: Async DNS, BitTorrent, ED2K, GZip, HTTPS, Message Digest, Metalink, XML-RPC, SFTP
+`
+
 describe('Aria2ProcessManager', () => {
   let manager: Aria2ProcessManager
 
@@ -150,6 +156,26 @@ describe('Aria2ProcessManager', () => {
       const report = await manager.probe('/usr/bin/aria2c')
 
       expect(report.version).toBe('1.36.0')
+      expect(report.hasSqlitePersistence).toBe(false)
+    })
+
+    it('parses aria2-next version output', async () => {
+      mockExecFile.mockImplementation(
+        (
+          _path: string,
+          _args: string[],
+          callback: (err: Error | null, stdout: string, stderr: string) => void
+        ) => {
+          callback(null, ARIA2_NEXT_OUTPUT, '')
+        }
+      )
+
+      const report = await manager.probe('/app/bin/aria2c')
+
+      expect(report.version).toBe('2.6.8')
+      expect(report.features).toContain('BitTorrent')
+      expect(report.features).toContain('ED2K')
+      expect(report.features).toContain('SFTP')
       expect(report.hasSqlitePersistence).toBe(false)
     })
 

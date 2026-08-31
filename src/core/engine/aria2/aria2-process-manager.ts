@@ -471,7 +471,7 @@ export class Aria2ProcessManager {
   }
 
   private parseVersionOutput(stdout: string): EngineFeatureReport | null {
-    const versionMatch = stdout.match(/aria2 version (\S+)/)
+    const versionMatch = stdout.match(/(?:aria2|Aria2 Next) version (\S+)/)
     if (!versionMatch) return null
     const version = versionMatch[1]
 
