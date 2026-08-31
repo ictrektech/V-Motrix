@@ -4,7 +4,7 @@ set -euo pipefail
 IMAGE_NAME="v-motrix"
 IMAGE_REPOSITORY="swr.cn-southwest-2.myhuaweicloud.com/ictrek/${IMAGE_NAME}"
 BASE_REPOSITORY="swr.cn-southwest-2.myhuaweicloud.com/ictrek/node"
-BASE_SOURCE="docker.m.daocloud.io/library/node:24-alpine"
+BASE_SOURCE="docker.m.daocloud.io/library/node:24-bookworm-slim"
 SPREADSHEET_TOKEN="${FEISHU_SPREADSHEET_TOKEN:-Htotsn3oahO1zxt73YMcaB1zn8e}"
 if [[ -z "${FEISHU_CONFIG_FILE:-}" ]]; then
   for candidate in "${HOME}/.feishu.components.json" "${HOME}/.feishu.json"; do
@@ -29,8 +29,8 @@ Supported sheets:
   ARM_with_cuda, ARM_without_cuda, l4t, thor_spark
 
 The script must run on a build host matching the selected architecture. It
-mirrors node:24-alpine through Docker Hub acceleration into ictrek SWR when
-the architecture-specific base image is not already present.
+mirrors node:24-bookworm-slim through Docker Hub acceleration into ictrek SWR
+when the architecture-specific base image is not already present.
 EOF
 }
 
@@ -142,7 +142,7 @@ APP_ID="$(read_config feishu_app_id)"
 APP_SECRET="$(read_config feishu_app_secret)"
 [[ -n "$APP_ID" && -n "$APP_SECRET" ]] || die "Feishu credentials are incomplete"
 
-BASE_IMAGE="${BASE_REPOSITORY}:24-alpine-${ARCH}"
+BASE_IMAGE="${BASE_REPOSITORY}:24-bookworm-slim-${ARCH}"
 if ! docker manifest inspect "$BASE_IMAGE" >/dev/null 2>&1; then
   log "Mirror missing base image: $BASE_SOURCE -> $BASE_IMAGE"
   docker pull --platform "$PLATFORM" "$BASE_SOURCE"

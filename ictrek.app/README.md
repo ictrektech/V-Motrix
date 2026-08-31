@@ -14,7 +14,7 @@ Build each architecture once on its matching host:
 ```
 
 The build script reuses the architecture-specific Node base image in ictrek
-SWR. If it is absent, the script pulls `node:24-alpine` through the configured
+SWR. If it is absent, the script pulls `node:24-bookworm-slim` through the configured
 Docker Hub accelerator and publishes it to
 `swr.cn-southwest-2.myhuaweicloud.com/ictrek/node` before building V-Motrix.
 
@@ -31,7 +31,7 @@ the package to VOS App Store.
 ## Storage and user isolation
 
 The package mounts `${VOS_APP_STORAGE_PATH}` at `/data` for app state and
-`${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix}/downloads`
+`${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix/downloads}`
 at `/downloads` for downloaded files. VOS OIDC Fastpath maps every immutable
 user subject to opaque directories:
 
