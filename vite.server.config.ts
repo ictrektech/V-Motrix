@@ -33,6 +33,7 @@ export default defineConfig({
       entry: {
         index: 'src/server/index.ts',
         'motrix-admin': 'src/server/operator-cli.ts',
+        'vos-gateway': 'src/server/vos-gateway.ts',
       },
       formats: ['es'],
     },

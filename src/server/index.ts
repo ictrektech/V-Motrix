@@ -1425,7 +1425,9 @@ async function main() {
     // Do not expose command/query ingress until restore, transition recovery,
     // and recovered Activity anchors have settled. Otherwise an early request
     // can observe an empty/partial TaskManager or a false TaskNotFound.
-    const port = parseServerPort(process.env.PORT, 'PORT', 8080)
+    const port = parseServerPort(process.env.PORT, 'PORT', 8080, {
+      allowZero: true,
+    })
     try {
       await app.listen({ port, host: '0.0.0.0' })
     } catch (err) {
@@ -1440,8 +1442,17 @@ async function main() {
       }
       return
     }
-    const serverUrl = `http://localhost:${port}`
-    log.info({ port, url: serverUrl }, `server listening at ${serverUrl}`)
+    const address = app.server.address()
+    const listeningPort =
+      address && typeof address !== 'string' ? address.port : port
+    const serverUrl = `http://localhost:${listeningPort}`
+    log.info(
+      { port: listeningPort, url: serverUrl },
+      `server listening at ${serverUrl}`
+    )
+    if (typeof process.send === 'function') {
+      process.send({ type: 'motrix-server-ready', port: listeningPort })
+    }
 
     // ─── MDXP bridge (Spec 6) ─────────────────────────────────────
     // Agent-facing unary POST /mdxp + SSE GET /mdxp/events, on its OWN port

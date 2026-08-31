@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 import packageJson from './package.json' with { type: 'json' }
 
 export default defineConfig({
-  base: '/',
+  base: process.env.MOTRIX_WEB_BASE_PATH?.trim() || '/',
   plugins: [tailwindcss()],
   define: {
     __MOTRIX_TARGET__: JSON.stringify('web'),

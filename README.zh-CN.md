@@ -8,6 +8,9 @@
 
 [English](./README.md) | 简体中文
 
+> VOS 集成人员请参阅 [`ictrek.app/README.md`](ictrek.app/README.md)，其中说明了
+> V-Motrix 多用户隔离镜像、打包和发布流程。
+
 ## 简介
 
 Motrix 是一款界面简洁、功能丰富的桌面下载管理器，可处理 HTTP、FTP、BitTorrent 和磁力链接（Magnet）等多种下载任务。

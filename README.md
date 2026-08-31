@@ -8,6 +8,9 @@
 
 English | [简体中文](./README.zh-CN.md)
 
+> VOS integrators: see [`ictrek.app/README.md`](ictrek.app/README.md) for the
+> multi-user-isolated V-Motrix image, packaging, and release workflow.
+
 ## Overview
 
 Motrix is a clean, full-featured desktop download manager for HTTP, FTP, BitTorrent, magnet links, and more.

@@ -1,0 +1,77 @@
+x-v-motrix-base: &v-motrix-base
+  restart: unless-stopped
+  networks:
+    vos_default:
+      aliases:
+        - v-motrix
+  environment:
+    PORT: "8080"
+    VOS_MOTRIX_DATA_ROOT: /data
+    VOS_OIDC_CLIENT_ID: com.ictrek.v-motrix
+    VOS_OIDC_SCOPE: openid profile email
+    VOS_OIDC_USERINFO_URL: ${VOS_OIDC_USERINFO_URL:-http://172.17.0.1:8105/v1000/oauth2/userinfo}
+    VOS_PUBLIC_BASE_PATH: /app/com.ictrek.v-motrix
+    VOS_APP_VERSION: "__APP_VERSION__"
+  volumes:
+    - ${VOS_APP_STORAGE_PATH}/data:/data
+  labels:
+    - "traefik.enable=true"
+    - "traefik.docker.network=vos_default"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.rule=PathPrefix(`/app/com.ictrek.v-motrix`) && HeadersRegexp(`Sec-Fetch-Dest`, `document`)"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.priority=1000"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.service=${COMPOSE_PROJECT_NAME:-v-motrix}-web"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.middlewares=${COMPOSE_PROJECT_NAME:-v-motrix}-top-open-redirect"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open-redirect.redirectregex.regex=^(https?://[^/]+)/app/com\\.ictrek\\.v-motrix/?(?:\\?.*)?$$"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open-redirect.redirectregex.replacement=$${1}/#/app/com.ictrek.v-motrix/com-ictrek-v-motrix/downloads"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open-redirect.redirectregex.permanent=false"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-web.rule=PathPrefix(`/app/com.ictrek.v-motrix`)"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-web.service=${COMPOSE_PROJECT_NAME:-v-motrix}-web"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-web.middlewares=${COMPOSE_PROJECT_NAME:-v-motrix}-web-slash,${COMPOSE_PROJECT_NAME:-v-motrix}-web-strip"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-web-slash.redirectregex.regex=^(.*)/app/com\\.ictrek\\.v-motrix$$"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-web-slash.redirectregex.replacement=$${1}/app/com.ictrek.v-motrix/"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-web-slash.redirectregex.permanent=true"
+    - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-v-motrix}-web-strip.stripprefix.prefixes=/app/com.ictrek.v-motrix"
+    - "traefik.http.services.${COMPOSE_PROJECT_NAME:-v-motrix}-web.loadbalancer.server.port=8080"
+  healthcheck:
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    interval: 30s
+    timeout: 10s
+    start_period: 60s
+    retries: 3
+
+services:
+  v-motrix-amd:
+    <<: *v-motrix-base
+    profiles: ["amd"]
+    image: ${V_MOTRIX_AMD_IMAGE}
+    pull_policy: always
+    environment:
+      PORT: "8080"
+      VOS_MOTRIX_DATA_ROOT: /data
+      VOS_OIDC_CLIENT_ID: com.ictrek.v-motrix
+      VOS_OIDC_SCOPE: openid profile email
+      VOS_OIDC_USERINFO_URL: ${VOS_OIDC_USERINFO_URL:-http://172.17.0.1:8105/v1000/oauth2/userinfo}
+      VOS_PUBLIC_BASE_PATH: /app/com.ictrek.v-motrix
+      VOS_APP_VERSION: "__APP_VERSION__"
+      VOS_PROFILE: amd
+      VOS_IMAGE: ${V_MOTRIX_AMD_IMAGE}
+
+  v-motrix-arm:
+    <<: *v-motrix-base
+    profiles: ["arm"]
+    image: ${V_MOTRIX_ARM_IMAGE}
+    pull_policy: always
+    environment:
+      PORT: "8080"
+      VOS_MOTRIX_DATA_ROOT: /data
+      VOS_OIDC_CLIENT_ID: com.ictrek.v-motrix
+      VOS_OIDC_SCOPE: openid profile email
+      VOS_OIDC_USERINFO_URL: ${VOS_OIDC_USERINFO_URL:-http://172.17.0.1:8105/v1000/oauth2/userinfo}
+      VOS_PUBLIC_BASE_PATH: /app/com.ictrek.v-motrix
+      VOS_APP_VERSION: "__APP_VERSION__"
+      VOS_PROFILE: arm
+      VOS_IMAGE: ${V_MOTRIX_ARM_IMAGE}
+
+networks:
+  vos_default:
+    external: true

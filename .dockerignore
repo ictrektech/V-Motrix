@@ -6,6 +6,7 @@
 dist
 release
 node_modules
+.pnpm-store
 docs
 e2e
 *.log

@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1.7
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE} AS deps
+
+RUN apk add --no-cache python3 make g++
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY packages/native-host/package.json ./packages/native-host/package.json
+COPY scripts/postinstall.mjs scripts/fetch-engine.mjs ./scripts/
+ENV MOTRIX_SKIP_ELECTRON_REBUILD=1 \
+    MOTRIX_SKIP_ENGINE_FETCH=1
+RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
+    corepack enable \
+ && corepack prepare pnpm@11.22.0 --activate \
+ && pnpm config set store-dir /pnpm/store \
+ && pnpm install --frozen-lockfile
+
+FROM ${NODE_IMAGE} AS production-deps
+RUN apk add --no-cache python3 make g++
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY packages/native-host/package.json ./packages/native-host/package.json
+COPY scripts/postinstall.mjs scripts/fetch-engine.mjs ./scripts/
+ENV CI=true \
+    MOTRIX_SKIP_ELECTRON_REBUILD=1 \
+    MOTRIX_SKIP_ENGINE_FETCH=1
+RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
+    corepack enable \
+ && corepack prepare pnpm@11.22.0 --activate \
+ && pnpm config set store-dir /pnpm/store \
+ && pnpm install --prod --frozen-lockfile --ignore-scripts
+
+FROM deps AS build
+ARG TARGETARCH
+ARG VOS_BASE_PATH=/app/com.ictrek.v-motrix/
+WORKDIR /app
+COPY . .
+RUN ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
+    node node_modules/electron/install.js
+RUN --mount=type=cache,id=v-motrix-builtins,target=/app/node_modules/.cache/motrix-builtins \
+    case "${TARGETARCH}" in \
+      amd64) engine_arch=x64 ;; \
+      arm64) engine_arch=arm64 ;; \
+      *) echo "unsupported Docker target architecture: ${TARGETARCH}" >&2; exit 2 ;; \
+    esac \
+ && node scripts/fetch-engine.mjs --platform linux --arch "${engine_arch}" \
+ && pnpm run check:third-party-notices \
+ && MOTRIX_WEB_BASE_PATH="${VOS_BASE_PATH}" pnpm run build:server \
+ && node scripts/stage-server-app.mjs --platform linux --arch "${TARGETARCH}" --libc musl --strict \
+ && node scripts/verify-server-package.mjs --app-dir dist/server-app --platform linux --arch "${TARGETARCH}" --libc musl
+
+FROM ${NODE_IMAGE} AS runtime
+ARG OCI_REVISION=unknown
+ARG OCI_VERSION=0.0.0-local
+RUN apk add --no-cache ca-certificates \
+ && rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /opt/yarn-v1.22.22 \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+          /usr/local/bin/pnpm /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+ && mkdir -p /data /app \
+ && chown -R node:node /data /app
+WORKDIR /app
+COPY --from=build --chown=node:node /app/package.json ./package.json
+COPY --from=build --chown=node:node /app/dist/server ./dist/server
+COPY --from=build --chown=node:node /app/dist/core/plugin/host ./dist/core/plugin/host
+COPY --from=build --chown=node:node /app/dist/renderer-web ./dist/renderer-web
+COPY --from=build --chown=node:node /app/dist/server-app/bin/aria2c ./bin/aria2c
+COPY --from=production-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/extra/aria2.conf ./extra/aria2.conf
+COPY --from=build --chown=node:node /app/dist/builtin-plugins ./builtin-plugins
+COPY --from=build --chown=node:node /app/LICENSE ./LICENSE
+COPY --from=build --chown=node:node /app/THIRD_PARTY_NOTICES.md ./THIRD_PARTY_NOTICES.md
+COPY --from=build --chown=node:node /app/THIRD_PARTY_NOTICES.zh-CN.md ./THIRD_PARTY_NOTICES.zh-CN.md
+COPY --from=build --chown=node:node /app/THIRD_PARTY_LICENSES ./THIRD_PARTY_LICENSES
+COPY --from=build --chown=node:node /app/build/legal/THIRD_PARTY_DEPENDENCIES.md ./legal/THIRD_PARTY_DEPENDENCIES.md
+COPY --from=build --chown=node:node /app/build/legal/THIRD_PARTY_LICENSES.txt ./legal/THIRD_PARTY_LICENSES.txt
+COPY --from=build --chown=node:node /app/build/legal/sbom.spdx.json ./legal/sbom.spdx.json
+LABEL org.opencontainers.image.title="V-Motrix" \
+      org.opencontainers.image.description="Multi-user isolated Motrix download manager for VOS" \
+      org.opencontainers.image.source="https://github.com/ictrektech/V-Motrix" \
+      org.opencontainers.image.revision="${OCI_REVISION}" \
+      org.opencontainers.image.version="${OCI_VERSION}" \
+      org.opencontainers.image.licenses="MIT"
+ENV YARN_VERSION= \
+    PATH=/app/bin:${PATH} \
+    NODE_ENV=production \
+    MOTRIX_RENDERER_DIR=/app/dist/renderer-web \
+    MOTRIX_BUILTIN_PLUGIN_DIR=/app/builtin-plugins \
+    MOTRIX_EXTRA_DIR=/app/extra \
+    MOTRIX_ARIA2_BIN=/app/bin/aria2c \
+    VOS_MOTRIX_DATA_ROOT=/data \
+    VOS_OIDC_CLIENT_ID=com.ictrek.v-motrix \
+    VOS_PUBLIC_BASE_PATH=/app/com.ictrek.v-motrix \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    HOME=/data \
+    PORT=8080
+VOLUME ["/data"]
+EXPOSE 8080
+USER node
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||'8080')+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+CMD ["node", "dist/server/vos-gateway.mjs"]

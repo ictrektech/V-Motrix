@@ -1,0 +1,55 @@
+id: com.ictrek.v-motrix
+name:
+  zh-CN: V-Motrix
+  en: V-Motrix
+description:
+  zh-CN: 面向 VOS 的多用户隔离下载管理器，每位系统用户拥有独立的任务、设置与下载文件。
+  en: A VOS download manager with isolated tasks, settings, and files for every system user.
+version: __APP_VERSION__
+author: ictrek
+category: [storage]
+arch: [amd64, arm64]
+icon: icon.png
+
+frontend:
+  enabled: true
+  basePath: /app/com.ictrek.v-motrix
+
+platform:
+  version: ">=3.0.0"
+
+oauth2:
+  client:
+    id: com.ictrek.v-motrix
+    redirect_uris:
+      - https://app.vos-platform.internal/callback
+    grant_types: [authorization_code, refresh_token]
+    response_types: [code]
+    scopes: [openid, profile, email]
+    pkce_required: true
+    token_endpoint_auth_method: none
+    access_token_ttl: 3600
+    refresh_token_ttl: 1209600
+
+profiles:
+  - name: amd
+    title:
+      zh-CN: AMD64
+      en: AMD64
+    description:
+      zh-CN: x86_64 / AMD64 平台。
+      en: x86_64 / AMD64 platform.
+    conflicts: [arm]
+  - name: arm
+    title:
+      zh-CN: ARM64
+      en: ARM64
+    description:
+      zh-CN: ARM64 平台。
+      en: ARM64 platform.
+    conflicts: [amd]
+
+storage:
+  directories:
+    - path: data
+      mode: "0755"

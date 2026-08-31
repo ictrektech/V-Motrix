@@ -1,0 +1,10 @@
+configs:
+  - name: VOS_OIDC_USERINFO_URL
+    type: string
+    title:
+      zh-CN: VOS OIDC 用户信息地址
+      en: VOS OIDC Userinfo URL
+    description:
+      zh-CN: V-Motrix 后端用于校验 Fastpath access token 的 VOS userinfo 地址。
+      en: VOS userinfo endpoint used by V-Motrix to verify Fastpath access tokens.
+    default: http://172.17.0.1:8105/v1000/oauth2/userinfo

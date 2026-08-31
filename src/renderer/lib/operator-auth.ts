@@ -7,7 +7,7 @@
  * them (it uses IPC).
  */
 
-const base = globalThis.location?.origin ?? ''
+const base = `${globalThis.location?.origin ?? ''}${import.meta.env.BASE_URL.replace(/\/$/, '')}`
 
 export async function getOperatorStatus(): Promise<boolean> {
   try {
