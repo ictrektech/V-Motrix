@@ -9,7 +9,7 @@ if [ "$(id -u)" = "0" ]; then
   chown node:node "$download_root" "$download_root/users"
   chmod 0755 /data /data/users /data/tmp /data/home /data/torrents
   chmod 0755 "$download_root" "$download_root/users"
-  exec gosu node:node "$@"
+  exec runuser -u node -- "$@"
 fi
 
 exec "$@"
