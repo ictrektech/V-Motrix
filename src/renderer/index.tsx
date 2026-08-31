@@ -1,3 +1,4 @@
+import { renderBootstrapError } from '@renderer/lib/bootstrap-error'
 import {
   bootstrapVosSession,
   installVosStoragePartition,
@@ -16,4 +17,8 @@ async function bootstrap(): Promise<void> {
   await startRenderer(container)
 }
 
-void bootstrap()
+void bootstrap().catch((error: unknown) => {
+  console.error('[v-motrix:bootstrap] application startup failed', error)
+  const container = document.getElementById('root')
+  if (container) renderBootstrapError(container, error)
+})

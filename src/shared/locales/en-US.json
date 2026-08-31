@@ -6,6 +6,12 @@
     "error": "Invalid operator token. Check MOTRIX_OPERATOR_TOKEN or <dataDir>/operator-token on the host and try again.",
     "submit": "Unlock"
   },
+  "bootstrapError": {
+    "title": "V-Motrix could not start",
+    "detail": "Startup detail: {{message}}",
+    "unknownDetail": "VOS user verification or application initialization failed",
+    "retry": "Reload"
+  },
   "operatorAdmin": {
     "help": "Usage:\n  motrix-admin pairing pending [--json]\n  motrix-admin pairing approve <user-code> [--json]\n  motrix-admin pairing deny <user-code> [--json]\n\nThe command talks only to the running Motrix server over container loopback.",
     "errorPrefix": "motrix-admin: {{message}}",

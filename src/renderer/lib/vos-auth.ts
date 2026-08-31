@@ -1,3 +1,5 @@
+import { sha256 } from '@noble/hashes/sha2.js'
+
 export interface VosSessionUser {
   username: string
   namespace: string
@@ -70,9 +72,10 @@ async function exchangeFastpath(
   const verifier = base64Url(randomBytes())
   const state = base64Url(randomBytes())
   const nonce = base64Url(randomBytes())
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
-  )
+  // VOS is commonly reached through a plain HTTP/IP origin. WebCrypto's
+  // `subtle` API is unavailable there, so PKCE must use a synchronous,
+  // browser-safe SHA-256 implementation rather than crypto.subtle.
+  const digest = sha256(new TextEncoder().encode(verifier))
   const clientId = config.clientId || 'com.ictrek.v-motrix'
   const authorized = await oauth2.authorize({
     client_id: clientId,

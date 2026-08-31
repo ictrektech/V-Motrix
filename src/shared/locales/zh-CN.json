@@ -6,6 +6,12 @@
     "error": "operator token 无效。请核对 host 上的 MOTRIX_OPERATOR_TOKEN 或 <dataDir>/operator-token 后重试。",
     "submit": "解锁"
   },
+  "bootstrapError": {
+    "title": "V-Motrix 无法启动",
+    "detail": "启动详情：{{message}}",
+    "unknownDetail": "VOS 用户验证或应用初始化失败",
+    "retry": "重新加载"
+  },
   "operatorAdmin": {
     "help": "用法：\n  motrix-admin pairing pending [--json]\n  motrix-admin pairing approve <配对码> [--json]\n  motrix-admin pairing deny <配对码> [--json]\n\n此命令仅通过容器内的本机回环地址与正在运行的 Motrix 服务器通信。",
     "errorPrefix": "motrix-admin：{{message}}",
