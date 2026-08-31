@@ -63,8 +63,66 @@ esac
 
 require_cmd curl
 require_cmd docker
+require_cmd install
 require_cmd python3
+require_cmd tar
 [[ -r "$FEISHU_CONFIG_FILE" ]] || die "Feishu config not readable: $FEISHU_CONFIG_FILE"
+
+prefetch_engine() {
+  local engine_arch key metadata repo tag archive_name binary_name archive_sha binary_sha
+  local work_dir archive_path source_url destination
+  case "$ARCH" in
+    amd64) engine_arch="x64" ;;
+    arm64) engine_arch="arm64" ;;
+  esac
+  key="linux-${engine_arch}"
+  metadata="$(python3 - "$key" <<'PY'
+import json, sys
+with open('scripts/engine.lock.json', encoding='utf-8') as handle:
+    lock = json.load(handle)
+asset = lock['assets'][sys.argv[1]]
+print('\t'.join((lock['repo'], lock['tag'], asset['file'], asset['bin'], asset['archiveSha256'], asset['binarySha256'])))
+PY
+)"
+  IFS=$'\t' read -r repo tag archive_name binary_name archive_sha binary_sha <<< "$metadata"
+  destination="extra/linux/${engine_arch}/${binary_name}"
+  if [[ -f "$destination" ]] && python3 - "$destination" "$binary_sha" <<'PY'
+import hashlib, pathlib, sys
+raise SystemExit(0 if hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest() == sys.argv[2].lower() else 1)
+PY
+  then
+    log "Reuse verified aria2 engine: $destination"
+    return
+  fi
+
+  work_dir="$(mktemp -d)"
+  archive_path="${work_dir}/${archive_name}"
+  source_url="https://github.com/${repo}/releases/download/${tag}/${archive_name}"
+  trap 'rm -rf "$work_dir"' RETURN
+  log "Download pinned aria2 engine: $source_url"
+  curl --fail --location --retry 5 --retry-delay 2 --retry-all-errors \
+    --connect-timeout 20 --max-time 300 --output "$archive_path" "$source_url"
+  python3 - "$archive_path" "$archive_sha" <<'PY'
+import hashlib, pathlib, sys
+actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
+if actual != sys.argv[2].lower():
+    raise SystemExit(f'aria2 archive digest mismatch: expected={sys.argv[2].lower()} actual={actual}')
+PY
+  tar -xzf "$archive_path" -C "$work_dir"
+  python3 - "${work_dir}/${binary_name}" "$binary_sha" <<'PY'
+import hashlib, pathlib, sys
+actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
+if actual != sys.argv[2].lower():
+    raise SystemExit(f'aria2 binary digest mismatch: expected={sys.argv[2].lower()} actual={actual}')
+PY
+  mkdir -p "$(dirname "$destination")"
+  install -m 0755 "${work_dir}/${binary_name}" "$destination"
+  rm -rf "$work_dir"
+  trap - RETURN
+  log "Verified aria2 engine: $destination"
+}
+
+prefetch_engine
 
 read_config() {
   python3 - "$FEISHU_CONFIG_FILE" "$1" <<'PY'

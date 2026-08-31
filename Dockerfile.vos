@@ -38,7 +38,6 @@ COPY . .
 RUN ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
     node node_modules/electron/install.js
 RUN --mount=type=cache,id=v-motrix-builtins,target=/app/node_modules/.cache/motrix-builtins \
-    --mount=type=cache,id=v-motrix-engine,target=/app/extra/linux \
     case "${TARGETARCH}" in \
       amd64) engine_arch=x64 ;; \
       arm64) engine_arch=arm64 ;; \
