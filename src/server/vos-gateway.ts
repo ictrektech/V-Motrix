@@ -66,6 +66,14 @@ function normalizeBasePath(value: string): string {
   return withLeadingSlash.replace(/\/+$/, '')
 }
 
+function stripPublicBasePath(pathname: string): string {
+  if (PUBLIC_BASE_PATH === '/') return pathname
+  if (pathname === PUBLIC_BASE_PATH) return '/'
+  const prefix = `${PUBLIC_BASE_PATH}/`
+  if (!pathname.startsWith(prefix)) return pathname
+  return pathname.slice(PUBLIC_BASE_PATH.length) || '/'
+}
+
 function json(
   response: ServerResponse,
   status: number,
@@ -312,7 +320,8 @@ function proxyHeaders(
 async function proxyHttp(
   request: IncomingMessage,
   response: ServerResponse,
-  runtime: ChildRuntime
+  runtime: ChildRuntime,
+  upstreamPath: string
 ): Promise<void> {
   const isJson = contentTypeIsJson(request.headers)
   const body = isJson
@@ -331,7 +340,7 @@ async function proxyHttp(
         host: '127.0.0.1',
         port: runtime.port,
         method: request.method,
-        path: request.url,
+        path: upstreamPath,
         headers,
       },
       (upstreamResponse) => {
@@ -525,15 +534,17 @@ const server = http.createServer((request, response) => {
       request.url || '/',
       `http://${request.headers.host || 'localhost'}`
     )
-    if (url.pathname === '/healthz') {
+    const pathname = stripPublicBasePath(url.pathname)
+    const upstreamPath = `${pathname}${url.search}`
+    if (pathname === '/healthz') {
       json(response, 200, { ok: true })
       return
     }
-    if (await handleAuth(request, response, url.pathname)) return
+    if (await handleAuth(request, response, pathname)) return
     const protectedPath =
-      url.pathname.startsWith('/rpc/') || url.pathname.startsWith('/api/')
+      pathname.startsWith('/rpc/') || pathname.startsWith('/api/')
     if (!protectedPath && request.method === 'GET') {
-      await serveStatic(request, response, url.pathname)
+      await serveStatic(request, response, pathname)
       return
     }
     const found = sessionFor(request)
@@ -541,7 +552,7 @@ const server = http.createServer((request, response) => {
       json(response, 401, { error: 'VOS authentication required' })
       return
     }
-    await proxyHttp(request, response, await childFor(found.user))
+    await proxyHttp(request, response, await childFor(found.user), upstreamPath)
   })().catch((error: unknown) => {
     if (response.headersSent) {
       response.destroy(error instanceof Error ? error : undefined)
@@ -576,7 +587,8 @@ server.on('upgrade', (request, socket, head) => {
       request.url || '/',
       `http://${request.headers.host || 'localhost'}`
     )
-    if (url.pathname !== '/rpc/events') {
+    const pathname = stripPublicBasePath(url.pathname)
+    if (pathname !== '/rpc/events') {
       socket.destroy()
       return
     }
