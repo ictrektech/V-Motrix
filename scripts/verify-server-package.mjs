@@ -346,7 +346,7 @@ export async function verifyServerPackage(options) {
     const assetKey = `${target.platform}-${target.arch}`
     const asset = engineLock?.assets?.[assetKey]
     if (
-      engineLock?.engine !== 'aria2' ||
+      !['aria2', 'aria2-next'].includes(engineLock?.engine) ||
       typeof engineLock.version !== 'string' ||
       !asset ||
       asset.bin !== engineBinaryName ||

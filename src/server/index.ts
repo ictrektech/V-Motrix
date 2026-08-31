@@ -397,6 +397,7 @@ async function main() {
     path.join(platform.extraResourceDir, 'aria2.conf'),
     platform.userDataDir,
     {
+      ed2kBootstrapDir: path.join(platform.extraResourceDir, 'ed2k-bootstrap'),
       rpcListenAll: parseServerBoolean(
         process.env.MOTRIX_ARIA2_RPC_LISTEN_ALL,
         'MOTRIX_ARIA2_RPC_LISTEN_ALL'

@@ -29,7 +29,11 @@ import {
 import type { SettingsManager } from '@core/settings/settings-manager'
 import { INCOMPLETE_SUFFIX } from '@shared/constants/incomplete'
 import { AppError, ErrorCode } from '@shared/errors'
-import { isFtpFamilyUri, isHttpFamilyUri } from '@shared/protocol/resource-uri'
+import {
+  ed2kFileName,
+  isFtpFamilyUri,
+  isHttpFamilyUri,
+} from '@shared/protocol/resource-uri'
 import type {
   TaskCreateRequest,
   TaskCreateSuccessResult,
@@ -712,7 +716,11 @@ async function handleCreateTaskUnderAdmission(
     // name onto that final URI before probing, so a failed/empty metadata
     // response cannot resurrect the original request's basename.
     if (!req.filename?.trim()) {
-      await pickHttpName(uriBasename(params.uris[0]) ?? 'download')
+      await pickHttpName(
+        ed2kFileName(params.uris[0] ?? '') ??
+          uriBasename(params.uris[0]) ??
+          currentHttpDesiredName
+      )
     }
 
     // Probe only after mux has declined the URL and the plugin chain has
@@ -1091,6 +1099,8 @@ function deriveDesiredName(
   if (req.type === 'http') {
     const fname = req.filename?.trim()
     if (fname) return fname
+    const fromEd2k = ed2kFileName(req.uris[0] ?? '')
+    if (fromEd2k) return fromEd2k
     const fromUri = uriBasename(req.uris[0])
     if (fromUri) return fromUri
     return 'download'

@@ -78,13 +78,13 @@ must obtain permission or replace the font before distributing the build.
 
 ---
 
-## aria2 download engine
+## aria2-next download engine
 
 Desktop builds bundle an `aria2c` executable pinned by
 `scripts/engine.lock.json`:
 
-- **Version:** 1.37.0-motrix.10
-- **Source:** <https://github.com/motrixapp/aria2/tree/v1.37.0-motrix.10>
+- **Version:** 2.6.8
+- **Source:** <https://github.com/AnInsomniacy/aria2-next/tree/v2.6.8>
 - **License:** GNU General Public License v2.0 or later (`GPL-2.0-or-later`)
 - **Full license text:** `THIRD_PARTY_LICENSES/aria2-COPYING`
 - **OpenSSL exception / notice:**

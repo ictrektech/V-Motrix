@@ -1,16 +1,25 @@
 const BARE_INFO_HASH_RE = /^(?:[a-f0-9]{40}|[a-z2-7]{32})$/i
+const ED2K_FILE_RE = /^ed2k:\/\/\|file\|[^|]+\|\d+\|[a-f0-9]{32}\|\/?$/i
 
 const DIRECT_RESOURCE_PROTOCOLS = new Set(['http:', 'https:', 'ftp:', 'sftp:'])
 
-export function normalizeBareInfoHash(input: string): string {
+function normalizeMagnetScheme(input: string): string {
   const trimmed = input.trim()
+  if (!trimmed.toLowerCase().startsWith('magnet://')) return trimmed
+
+  const payload = trimmed.slice('magnet://'.length)
+  return payload.startsWith('?') ? `magnet:${payload}` : `magnet:?${payload}`
+}
+
+export function normalizeBareInfoHash(input: string): string {
+  const trimmed = normalizeMagnetScheme(input)
   return BARE_INFO_HASH_RE.test(trimmed)
     ? `magnet:?xt=urn:btih:${trimmed}`
     : trimmed
 }
 
 export function isMagnetUri(input: string): boolean {
-  return input.toLowerCase().startsWith('magnet:?')
+  return normalizeMagnetScheme(input).toLowerCase().startsWith('magnet:?')
 }
 
 export function isThunderUri(input: string): boolean {
@@ -18,7 +27,19 @@ export function isThunderUri(input: string): boolean {
 }
 
 export function isEd2kUri(input: string): boolean {
-  return input.toLowerCase().startsWith('ed2k://|file|')
+  return ED2K_FILE_RE.test(input.trim())
+}
+
+export function ed2kFileName(input: string): string | null {
+  const trimmed = input.trim()
+  if (!isEd2kUri(trimmed)) return null
+  const name = trimmed.split('|')[2]?.trim()
+  if (!name) return null
+  try {
+    return decodeURIComponent(name)
+  } catch {
+    return name
+  }
 }
 
 export function isHttpFamilyUri(input: string): boolean {
@@ -45,7 +66,7 @@ export function decodeThunderUri(input: string): string | null {
       .padEnd(Math.ceil(payload.length / 4) * 4, '=')
     const decoded = globalThis.atob(padded)
     if (!decoded.startsWith('AA') || !decoded.endsWith('ZZ')) return null
-    const inner = decoded.slice(2, -2).trim()
+    const inner = normalizeResourceUriLine(decoded.slice(2, -2))
     return isDownloadableResourceUri(inner) ? inner : null
   } catch {
     return null
@@ -59,6 +80,7 @@ export function normalizeResourceUriLine(input: string): string {
 }
 
 export function isDirectResourceUri(input: string): boolean {
+  if (isEd2kUri(input)) return true
   try {
     const parsed = new URL(input)
     return DIRECT_RESOURCE_PROTOCOLS.has(parsed.protocol)

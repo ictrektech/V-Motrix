@@ -143,6 +143,7 @@ export interface EngineRecoveryResult {
 export interface EngineCapability {
   http: boolean
   ftp: boolean
+  ed2k: boolean
   bt: boolean
   magnet: boolean
   metalink: boolean

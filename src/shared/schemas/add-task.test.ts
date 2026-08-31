@@ -114,8 +114,10 @@ describe('taskCreateRequestSchema', () => {
 
   it('accepts Motrix Next direct resource protocols supported by the current engine', () => {
     for (const uri of [
+      'https://example.com/file.zip',
       'ftp://example.com/file.zip',
       'sftp://example.com/file.zip',
+      'ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/',
     ]) {
       const result = taskCreateRequestSchema.safeParse({
         type: 'http',
@@ -127,10 +129,10 @@ describe('taskCreateRequestSchema', () => {
     }
   })
 
-  it('rejects ED2K until the bundled engine supports it', () => {
+  it('rejects malformed ED2K file links before they reach the engine', () => {
     const result = taskCreateRequestSchema.safeParse({
       type: 'http',
-      uris: ['ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/'],
+      uris: ['ed2k://|file|ubuntu.iso|1|not-a-hash|/'],
       saveDir: '/d',
       headers: [],
     })
@@ -171,6 +173,22 @@ describe('taskCreateRequestSchema', () => {
       saveDir: '/d',
     })
     expect(result.success).toBe(true)
+  })
+
+  it('normalizes magnet scheme variants before bt validation', () => {
+    const hash = 'a'.repeat(40)
+    const result = taskCreateRequestSchema.safeParse({
+      type: 'bt',
+      payload: { kind: 'magnet', uri: `magnet://xt=urn:btih:${hash}` },
+      selectedFiles: [],
+      saveDir: '/d',
+    })
+    expect(result.success).toBe(true)
+    if (!result.success || result.data.type !== 'bt') return
+    expect(result.data.payload).toEqual({
+      kind: 'magnet',
+      uri: `magnet:?xt=urn:btih:${hash}`,
+    })
   })
 
   it('accepts bt magnet request without selected files', () => {
@@ -222,6 +240,21 @@ describe('formValuesToTaskCreateRequests', () => {
     expect(reqs[1]).toMatchObject({ type: 'http', uris: ['https://c/d'] })
   })
 
+  it('converts magnet scheme variants into bt task requests', () => {
+    const hash = 'a'.repeat(40)
+    const reqs = formValuesToTaskCreateRequests({
+      tab: 'links',
+      urls: `magnet://xt=urn:btih:${hash}`,
+      saveDir: '/d',
+    })
+    expect(reqs).toMatchObject([
+      {
+        type: 'bt',
+        payload: { kind: 'magnet', uri: `magnet:?xt=urn:btih:${hash}` },
+      },
+    ])
+  })
+
   it('converts a bare BitTorrent info hash into a magnet task request', () => {
     const hash = 'a'.repeat(40)
     const reqs = formValuesToTaskCreateRequests({
@@ -251,6 +284,41 @@ describe('formValuesToTaskCreateRequests', () => {
     expect(reqs).toMatchObject([
       { type: 'http', uris: ['ftp://example.com/file.zip'] },
     ])
+  })
+
+  it('routes thunder-wrapped magnet and ed2k links to executable task paths', () => {
+    const hash = 'b'.repeat(40)
+    const thunderMagnet = `thunder://${Buffer.from(
+      `AAmagnet://xt=urn:btih:${hash}ZZ`,
+      'utf8'
+    )
+      .toString('base64')
+      .replace(/=+$/u, '')}`
+    const ed2k = 'ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/'
+    const thunderEd2k = `thunder://${Buffer.from(`AA${ed2k}ZZ`, 'utf8')
+      .toString('base64')
+      .replace(/=+$/u, '')}`
+
+    expect(
+      formValuesToTaskCreateRequests({
+        tab: 'links',
+        urls: thunderMagnet,
+        saveDir: '/d',
+      })
+    ).toMatchObject([
+      {
+        type: 'bt',
+        payload: { kind: 'magnet', uri: `magnet:?xt=urn:btih:${hash}` },
+      },
+    ])
+
+    expect(
+      formValuesToTaskCreateRequests({
+        tab: 'links',
+        urls: thunderEd2k,
+        saveDir: '/d',
+      })
+    ).toMatchObject([{ type: 'http', uris: [ed2k] }])
   })
 
   it('applies the filename override only for a single line', () => {
@@ -420,6 +488,27 @@ describe('formValuesToTaskCreateRequest', () => {
     })
   })
 
+  it('converts magnet form scheme variants before reaching aria2', () => {
+    const hash = 'c'.repeat(40)
+    const req = formValuesToTaskCreateRequest({
+      tab: 'torrent',
+      source: 'magnet',
+      magnetUri: `magnet://xt=urn:btih:${hash}`,
+      torrentMeta: {
+        name: 't',
+        infoHash: 'a'.repeat(40),
+        totalSize: 0,
+        files: [],
+      },
+      selectedFiles: [0],
+      saveDir: '/d',
+    })
+    expect(req).toMatchObject({
+      type: 'bt',
+      payload: { kind: 'magnet', uri: `magnet:?xt=urn:btih:${hash}` },
+    })
+  })
+
   it('converts resolved magnet metadata form into a torrent-base64 request', () => {
     const req = formValuesToTaskCreateRequest({
       tab: 'torrent',
@@ -478,6 +567,18 @@ describe('formValuesToTaskCreateRequest', () => {
       uris: ['sftp://example.com/file.zip'],
     })
   })
+
+  it('keeps ed2k links on the direct resource path', () => {
+    const req = formValuesToTaskCreateRequest({
+      tab: 'links',
+      urls: 'ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/',
+      saveDir: '/d',
+    })
+    expect(req).toMatchObject({
+      type: 'http',
+      uris: ['ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/'],
+    })
+  })
 })
 
 describe('addTaskUrlParamsSchema', () => {
@@ -499,6 +600,17 @@ describe('addTaskUrlParamsSchema', () => {
       cookie: 'C',
     })
     expect(result.success).toBe(true)
+  })
+
+  it('accepts and normalizes magnet scheme variants', () => {
+    const hash = 'd'.repeat(40)
+    const result = addTaskUrlParamsSchema.safeParse({
+      magnet: `magnet://xt=urn:btih:${hash}`,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.magnet).toBe(`magnet:?xt=urn:btih:${hash}`)
+    }
   })
 })
 

@@ -12,6 +12,7 @@ import {
   extractArchive,
   fetchWithRetry,
   installAsset,
+  isDirectBinaryAsset,
   parseArgs,
   parseSha256Sums,
   resolveExtractCommand,
@@ -25,17 +26,41 @@ import {
 // A trimmed lockfile shaped exactly like scripts/engine.lock.json but with
 // obviously-fake digests — these tests only exercise selection/parse logic.
 const LOCK = {
-  repo: 'motrixapp/aria2',
-  tag: 'v1.37.0-motrix.1',
-  version: '1.37.0-motrix.1',
+  engine: 'aria2-next',
+  repo: 'AnInsomniacy/aria2-next',
+  tag: 'v2.6.8',
+  version: '2.6.8',
   assets: {
-    'darwin-arm64': { file: 'a-darwin-arm64.tar.gz', bin: 'aria2c' },
-    'darwin-x64': { file: 'a-darwin-x64.tar.gz', bin: 'aria2c' },
-    'win32-x64': { file: 'a-win32-x64.zip', bin: 'aria2c.exe' },
-    'win32-ia32': { file: 'a-win32-ia32.zip', bin: 'aria2c.exe' },
-    'linux-x64': { file: 'a-linux-x64.tar.gz', bin: 'aria2c' },
-    'linux-arm64': { file: 'a-linux-arm64.tar.gz', bin: 'aria2c' },
-    'linux-arm': { file: 'a-linux-armv7l.tar.gz', bin: 'aria2c' },
+    'darwin-arm64': {
+      file: 'aria2-next-darwin-arm64',
+      bin: 'aria2c',
+      extract: false,
+    },
+    'darwin-x64': {
+      file: 'aria2-next-darwin-x64',
+      bin: 'aria2c',
+      extract: false,
+    },
+    'win32-x64': {
+      file: 'aria2-next-win32-x64.exe',
+      bin: 'aria2c.exe',
+      extract: false,
+    },
+    'win32-arm64': {
+      file: 'aria2-next-win32-arm64.exe',
+      bin: 'aria2c.exe',
+      extract: false,
+    },
+    'linux-x64': {
+      file: 'aria2-next-linux-x64',
+      bin: 'aria2c',
+      extract: false,
+    },
+    'linux-arm64': {
+      file: 'aria2-next-linux-arm64',
+      bin: 'aria2c',
+      extract: false,
+    },
   },
 }
 
@@ -164,17 +189,17 @@ describe('selectKeys', () => {
   it('--platform without --arch returns every arch of that platform', () => {
     expect(
       selectKeys(LOCK, parseArgs(['--platform', 'linux']), host).sort()
-    ).toEqual(['linux-arm', 'linux-arm64', 'linux-x64'])
+    ).toEqual(['linux-arm64', 'linux-x64'])
   })
 
   it('--platform with --arch returns that single key', () => {
     expect(
       selectKeys(
         LOCK,
-        parseArgs(['--platform', 'win32', '--arch', 'ia32']),
+        parseArgs(['--platform', 'win32', '--arch', 'arm64']),
         host
       )
-    ).toEqual(['win32-ia32'])
+    ).toEqual(['win32-arm64'])
   })
 
   it('--arch without --platform pins the host platform to that arch', () => {
@@ -187,10 +212,10 @@ describe('selectKeys', () => {
     expect(() =>
       selectKeys(
         LOCK,
-        parseArgs(['--platform', 'win32', '--arch', 'arm64']),
+        parseArgs(['--platform', 'win32', '--arch', 'ia32']),
         host
       )
-    ).toThrow(/win32-arm64/)
+    ).toThrow(/win32-ia32/)
   })
 
   it('throws when a requested platform has no assets', () => {
@@ -337,6 +362,22 @@ describe('installAsset', () => {
     )
   })
 
+  it('installs direct aria2-next binary assets without extraction', async () => {
+    const s = makeStub({ archive: BINARY, binary: Buffer.from('ignored') })
+    const asset = {
+      file: 'aria2-next-2.6.8-macos-arm64',
+      bin: 'aria2c',
+      archiveSha256: hex('BINARY-BYTES'),
+      binarySha256: hex('BINARY-BYTES'),
+      extract: false,
+    }
+    const res = await installAsset({ ...ctx, asset }, s.deps)
+    expect(res).toBe('installed')
+    expect(isDirectBinaryAsset(asset)).toBe(true)
+    expect(s.files.get(target)?.toString()).toBe('BINARY-BYTES')
+    expect(s.extracted).toBe(0)
+  })
+
   it('skips (no download) when target already matches binarySha256', async () => {
     // archiveSha256 is deliberately WRONG — the skip MUST key on the binary
     // digest, not the archive digest (rev 2 core bug fix).
@@ -412,7 +453,8 @@ describe('run', () => {
   const ARCHIVE = Buffer.from('A')
   const BINARY = Buffer.from('B')
   const makeLock = (keys: string[]) => ({
-    repo: 'motrixapp/aria2',
+    engine: 'aria2-next',
+    repo: 'AnInsomniacy/aria2-next',
     tag: 'v1',
     version: '1',
     assets: Object.fromEntries(

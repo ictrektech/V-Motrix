@@ -1,4 +1,14 @@
 configs:
+  - name: VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH
+    type: path
+    title:
+      zh-CN: V-Motrix 共享下载目录
+      en: V-Motrix Shared Download Directory
+    description:
+      zh-CN: V-Motrix 下载文件的公共根目录。应用会在其中按 VOS 用户创建隔离子目录；界面仍显示为 /downloads。
+      en: Public root for V-Motrix downloads. The app creates isolated per-VOS-user subdirectories in this root while the UI still displays /downloads.
+    default: /data/vos_workspace/v-motrix
+    hints: [com.ictrek.download.storage]
   - name: VOS_OIDC_USERINFO_URL
     type: string
     title:

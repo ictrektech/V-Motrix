@@ -326,6 +326,7 @@ describe('Aria2Adapter', () => {
       expect(adapter.getCapabilities()).toEqual({
         http: true,
         ftp: true,
+        ed2k: false,
         bt: false,
         magnet: false,
         metalink: false,
@@ -344,7 +345,12 @@ describe('Aria2Adapter', () => {
       const rpc = createMockRpc()
       vi.mocked(rpc.getVersion).mockResolvedValue({
         version: '1.37.0',
-        enabledFeatures: ['BitTorrent', 'Metalink', 'SQLite3-Persistence'],
+        enabledFeatures: [
+          'BitTorrent',
+          'ED2K',
+          'Metalink',
+          'SQLite3-Persistence',
+        ],
       })
       const adapter = new Aria2Adapter(rpc)
 
@@ -353,13 +359,14 @@ describe('Aria2Adapter', () => {
       expect(adapter.getCapabilities()).toEqual({
         http: true,
         ftp: true,
+        ed2k: true,
         bt: true,
         magnet: true,
         metalink: true,
       })
       expect(adapter.getFeatureReport()).toEqual({
         version: '1.37.0',
-        features: ['BitTorrent', 'Metalink', 'SQLite3-Persistence'],
+        features: ['BitTorrent', 'ED2K', 'Metalink', 'SQLite3-Persistence'],
         hasSqlitePersistence: true,
         hasBtSeedUnverified: true,
         hasBtSaveMetadata: true,
@@ -398,6 +405,7 @@ describe('Aria2Adapter', () => {
       expect(adapter.getCapabilities()).toEqual({
         http: true,
         ftp: true,
+        ed2k: false,
         bt: false,
         magnet: false,
         metalink: false,

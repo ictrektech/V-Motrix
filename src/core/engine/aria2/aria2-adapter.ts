@@ -130,6 +130,7 @@ export class Aria2Adapter implements EngineAdapter {
   private capability: EngineCapability = {
     http: true,
     ftp: true,
+    ed2k: false,
     bt: false,
     magnet: false,
     metalink: false,
@@ -245,6 +246,7 @@ export class Aria2Adapter implements EngineAdapter {
       this.capability = {
         http: true,
         ftp: true,
+        ed2k: features.includes('ED2K'),
         bt: features.includes('BitTorrent'),
         magnet: features.includes('BitTorrent'),
         metalink: features.includes('Metalink'),

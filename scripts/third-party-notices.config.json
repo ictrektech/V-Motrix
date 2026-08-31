@@ -72,8 +72,8 @@
   },
   "externalComponents": [
     {
-      "id": "aria2",
-      "name": "aria2",
+      "id": "aria2-next",
+      "name": "aria2-next",
       "scope": "bundled desktop engine",
       "metadataFile": "scripts/engine.lock.json",
       "nameField": "engine",
@@ -85,7 +85,7 @@
         "THIRD_PARTY_LICENSES/aria2-LICENSE.OpenSSL"
       ],
       "noticeMarkers": [
-        "aria2",
+        "aria2-next",
         "{version}",
         "{licenseDeclared}",
         "{repository}"

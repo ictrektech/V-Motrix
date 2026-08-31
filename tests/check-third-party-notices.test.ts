@@ -402,15 +402,15 @@ describe('third-party graph dependency notices', () => {
   )
 
   it.each(['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.zh-CN.md'])(
-    '%s records aria2 and the retained Apple tray font',
+    '%s records aria2-next and the retained Apple tray font',
     async (noticeFile) => {
       const notice = await readFile(path.join(ROOT, noticeFile), 'utf8')
 
       expect(notice).toContain('SFNS-Regular.ttf')
       expect(notice).toContain('https://developer.apple.com/fonts/')
-      expect(notice).toContain('1.37.0-motrix.10')
+      expect(notice).toContain('2.6.8')
       expect(notice).toContain(
-        'https://github.com/motrixapp/aria2/tree/v1.37.0-motrix.10'
+        'https://github.com/AnInsomniacy/aria2-next/tree/v2.6.8'
       )
       expect(notice).toContain('GPL-2.0-or-later')
       expect(notice).toContain('THIRD_PARTY_LICENSES/aria2-COPYING')

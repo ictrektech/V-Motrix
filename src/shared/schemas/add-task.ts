@@ -103,7 +103,13 @@ const btTaskRequestSchema = z
       z.object({ kind: z.literal('torrent-base64'), base64: z.string() }),
       z.object({
         kind: z.literal('magnet'),
-        uri: z.string().startsWith('magnet:?'),
+        uri: z
+          .string()
+          .trim()
+          .transform((value) => normalizeResourceUriLine(value))
+          .refine((value) => isMagnetUri(value), {
+            message: 'task.add.errors.invalidUrl',
+          }),
       }),
     ]),
     selectedFiles: z.array(z.number().int().nonnegative()).default([]),
@@ -179,7 +185,14 @@ export const addTaskUrlParamsSchema = z.object({
   w: z.literal('add-task').optional(),
   mode: z.enum(['links', 'torrent']).default('links'),
   url: z.string().trim().min(1).optional(),
-  magnet: z.string().startsWith('magnet:?').optional(),
+  magnet: z
+    .string()
+    .trim()
+    .transform((value) => normalizeResourceUriLine(value))
+    .refine((value) => isMagnetUri(value), {
+      message: 'task.add.errors.invalidUrl',
+    })
+    .optional(),
   saveDir: z.string().min(1).optional(),
   userAgent: z.string().optional(),
   referer: z.string().optional(),
@@ -199,7 +212,13 @@ export const magnetFileSelectionPayloadSchema = z.object({
   // than creating a duplicate task.
   taskId: z.string().min(1),
   meta: torrentMetaSchema,
-  magnetUri: z.string().startsWith('magnet:?'),
+  magnetUri: z
+    .string()
+    .trim()
+    .transform((value) => normalizeResourceUriLine(value))
+    .refine((value) => isMagnetUri(value), {
+      message: 'task.add.errors.invalidUrl',
+    }),
   torrentBase64: z.string().min(1),
   saveDir: z.string(),
 })
@@ -283,7 +302,10 @@ export function formValuesToTaskCreateRequest(
   const shouldSubmitTorrentBytes = v.source === 'file' || Boolean(v.base64)
   const payload = shouldSubmitTorrentBytes
     ? ({ kind: 'torrent-base64', base64: v.base64 as string } as const)
-    : ({ kind: 'magnet', uri: v.magnetUri as string } as const)
+    : ({
+        kind: 'magnet',
+        uri: normalizeResourceUriLine(v.magnetUri as string),
+      } as const)
 
   return {
     type: 'bt',

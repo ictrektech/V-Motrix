@@ -13,6 +13,9 @@ import { rewritePaths, userFromPayload, type VosUser } from './vos-isolation'
 
 const PORT = parsePort(process.env.PORT, 8080)
 const DATA_ROOT = path.resolve(process.env.VOS_MOTRIX_DATA_ROOT || '/data')
+const DOWNLOAD_ROOT = path.resolve(
+  process.env.VOS_MOTRIX_DOWNLOAD_ROOT || '/downloads'
+)
 const RENDERER_ROOT = path.resolve(
   process.env.MOTRIX_RENDERER_DIR ||
     path.join(path.dirname(fileURLToPath(import.meta.url)), '../renderer-web')
@@ -171,6 +174,10 @@ function userRoot(user: VosUser): string {
   return path.join(DATA_ROOT, 'users', user.namespace)
 }
 
+function userDownloadRoot(user: VosUser): string {
+  return path.join(DOWNLOAD_ROOT, 'users', user.namespace, 'downloads')
+}
+
 async function persistIdentity(user: VosUser): Promise<void> {
   const root = userRoot(user)
   await mkdir(root, { recursive: true, mode: 0o700 })
@@ -207,14 +214,15 @@ function readyMessage(value: unknown): value is {
 async function startChild(user: VosUser): Promise<ChildRuntime> {
   const root = userRoot(user)
   const appData = path.join(root, 'app')
-  const downloads = path.join(root, 'downloads')
+  const downloads = userDownloadRoot(user)
   const home = path.join(root, 'home')
   const temp = path.join(root, 'tmp')
   await Promise.all(
-    [appData, downloads, home, temp].map((directory) =>
+    [appData, home, temp].map((directory) =>
       mkdir(directory, { recursive: true, mode: 0o700 })
     )
   )
+  await mkdir(downloads, { recursive: true, mode: 0o755 })
   const operatorToken = randomBytes(32).toString('base64url')
   const child = spawn(process.execPath, [serverEntry], {
     env: {

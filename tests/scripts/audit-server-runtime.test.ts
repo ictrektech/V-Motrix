@@ -296,6 +296,7 @@ describe('Server package contracts', () => {
       'build/legal/sbom.spdx.json',
       'dist/builtin-plugins',
       'extra/aria2.conf',
+      'extra/ed2k-bootstrap',
       'extra/{platform}/{arch}/{aria2Binary}',
     ])
     expect(contract.runtimeRoots).toEqual([

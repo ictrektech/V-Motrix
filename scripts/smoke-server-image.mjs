@@ -560,11 +560,11 @@ async function assertRuntimeContract(name, url, token, identity, timeoutMs) {
   if (
     diagnostics.health?.ok !== true ||
     diagnostics.engine?.state !== 'ready' ||
-    !/-motrix\.\d+$/.test(diagnostics.engine?.featureReport?.version ?? '') ||
-    diagnostics.engine?.featureReport?.hasSqlitePersistence !== true ||
-    !diagnostics.engine?.featureReport?.features?.includes(
-      'SQLite3-Persistence'
-    ) ||
+    diagnostics.engine?.featureReport?.version !== '2.6.8' ||
+    !diagnostics.engine?.featureReport?.features?.includes('BitTorrent') ||
+    !diagnostics.engine?.featureReport?.features?.includes('ED2K') ||
+    !diagnostics.engine?.featureReport?.features?.includes('Metalink') ||
+    !diagnostics.engine?.featureReport?.features?.includes('SFTP') ||
     diagnostics.process?.uid !== identity.uid ||
     diagnostics.storage?.dataDir !== '/data' ||
     diagnostics.storage?.tempDir !== '/data/tmp' ||
@@ -600,7 +600,11 @@ async function assertRuntimeContract(name, url, token, identity, timeoutMs) {
       'test "$SSL_CERT_FILE" = "/etc/ssl/certs/ca-certificates.crt"',
       'test -s "$SSL_CERT_FILE"',
       'test ! -e /usr/bin/aria2c',
-      "aria2c --version | grep -F -- 'SQLite3-Persistence'",
+      "aria2c --version | grep -F -- 'Aria2 Next version 2.6.8'",
+      "aria2c --version | grep -F -- 'BitTorrent'",
+      "aria2c --version | grep -F -- 'ED2K'",
+      "aria2c --version | grep -F -- 'Metalink'",
+      "aria2c --version | grep -F -- 'SFTP'",
       'pidof aria2c',
       "aria2_pid=$(for pid in $(pidof aria2c); do tr '\\0' '\\n' </proc/$pid/cmdline | grep -Fxq -- '--conf-path=/data/aria2.conf' && { echo $pid; break; }; done)",
       'test -n "$aria2_pid"',
@@ -608,6 +612,8 @@ async function assertRuntimeContract(name, url, token, identity, timeoutMs) {
       "tr '\\0' '\\n' </proc/$aria2_pid/cmdline | grep -Fx -- '--rpc-listen-all=false'",
       "tr '\\0' '\\n' </proc/$aria2_pid/cmdline | grep -Fx -- '--dht-file-path=/data/dht.dat'",
       "tr '\\0' '\\n' </proc/$aria2_pid/cmdline | grep -Fx -- '--dht-file-path6=/data/dht6.dat'",
+      "tr '\\0' '\\n' </proc/$aria2_pid/cmdline | grep -Fx -- '--ed2k-server-list=/app/extra/ed2k-bootstrap/server.met'",
+      "tr '\\0' '\\n' </proc/$aria2_pid/cmdline | grep -Fx -- '--ed2k-node-list=/app/extra/ed2k-bootstrap/nodes.dat'",
     ].join('; '),
   ])
   const hostConfig = JSON.parse(

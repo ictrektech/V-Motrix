@@ -565,6 +565,27 @@ describe('handleCreateTask', () => {
     expect(lastAddedTask(deps).type).toBe(TaskType.Ftp)
   })
 
+  it('dispatches ED2K file links through the direct addUri path', async () => {
+    const deps = makeDeps({ addUriGid: 'ed2ed2ed2ed2ed2e' })
+    const uri =
+      'ed2k://|file|ubuntu%2024.04.iso|1|0123456789abcdef0123456789abcdef|/'
+    await handleCreateTask(
+      {
+        type: 'http',
+        uris: [uri],
+        saveDir: '/d',
+        headers: [],
+      },
+      deps
+    )
+    expect(deps.addUri).toHaveBeenCalledWith(
+      [uri],
+      expect.objectContaining({ dir: '/d', out: 'ubuntu 24.04.iso.motrix' })
+    )
+    expect(lastAddedTask(deps).type).toBe(TaskType.Http)
+    expect(lastAddedTask(deps).name).toBe('ubuntu 24.04.iso')
+  })
+
   it('does not run HTTP-only plugin hooks for ftp-family direct downloads', async () => {
     const deps = makeDeps({ addUriGid: 'gid-ftp' })
     const runBeforeCreateHttp = vi.fn()

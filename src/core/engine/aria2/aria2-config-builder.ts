@@ -11,6 +11,7 @@ import { dnsModeToAsyncDns } from './dns-fallback'
 
 export interface Aria2ConfigBuilderOptions {
   rpcListenAll?: boolean
+  ed2kBootstrapDir?: string
 }
 
 export class Aria2ConfigBuilder {
@@ -20,6 +21,8 @@ export class Aria2ConfigBuilder {
   private readonly dhtFilePath: string
   private readonly dht6FilePath: string
   private readonly rpcListenAll: boolean
+  private readonly ed2kServerListPath: string | null
+  private readonly ed2kNodeListPath: string | null
 
   constructor(
     private templatePath: string,
@@ -32,6 +35,13 @@ export class Aria2ConfigBuilder {
     this.dhtFilePath = path.join(userConfigDir, 'dht.dat')
     this.dht6FilePath = path.join(userConfigDir, 'dht6.dat')
     this.rpcListenAll = options.rpcListenAll ?? false
+    const ed2kBootstrapDir = options.ed2kBootstrapDir?.trim()
+    this.ed2kServerListPath = ed2kBootstrapDir
+      ? path.join(ed2kBootstrapDir, 'server.met')
+      : null
+    this.ed2kNodeListPath = ed2kBootstrapDir
+      ? path.join(ed2kBootstrapDir, 'nodes.dat')
+      : null
   }
 
   async ensureUserConfig(): Promise<string> {
@@ -175,6 +185,12 @@ export class Aria2ConfigBuilder {
       `--dht-file-path6=${this.dht6FilePath}`,
       `--save-session=${this.saveSessionPath}`
     )
+    if (this.ed2kServerListPath && this.ed2kNodeListPath) {
+      args.push(
+        `--ed2k-server-list=${this.ed2kServerListPath}`,
+        `--ed2k-node-list=${this.ed2kNodeListPath}`
+      )
+    }
     const sqliteActive =
       hasSqlitePersistence && settings.sqlite3Persistence === true
     if (!sqliteActive) {

@@ -349,7 +349,10 @@ log.info({ extraDir: platform.extraResourceDir }, 'resolved extra directory')
 
 const configBuilder = new Aria2ConfigBuilder(
   path.join(platform.extraResourceDir, 'aria2.conf'),
-  platform.userDataDir
+  platform.userDataDir,
+  {
+    ed2kBootstrapDir: path.join(platform.extraResourceDir, 'ed2k-bootstrap'),
+  }
 )
 const trustStore = new Aria2TrustStore(platform.userDataDir)
 

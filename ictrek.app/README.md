@@ -9,8 +9,8 @@ table and contains no embedded image archives.
 Build each architecture once on its matching host:
 
 ```bash
-./build_image.sh --sheet AMD_with_cuda
-./build_image.sh --sheet ARM_with_cuda
+../build_image.sh --sheet AMD_with_cuda
+../build_image.sh --sheet ARM_with_cuda
 ```
 
 The build script reuses the architecture-specific Node base image in ictrek
@@ -30,17 +30,19 @@ the package to VOS App Store.
 
 ## Storage and user isolation
 
-The package mounts `${VOS_APP_STORAGE_PATH}` at `/data`; there is no
-install-time public download-directory selector. VOS OIDC Fastpath maps every
-immutable user subject to an opaque directory:
+The package mounts `${VOS_APP_STORAGE_PATH}` at `/data` for app state and
+`${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix}/downloads`
+at `/downloads` for downloaded files. VOS OIDC Fastpath maps every immutable
+user subject to opaque directories:
 
 ```text
-/data/users/<subject-hash>/
-├── app/          # settings, database, plugins, aria2 session
-├── downloads/    # completed and partial downloads
+/data/users/<subject-hash>/                 # private app state
+├── app/                                    # settings, database, plugins, aria2 session
 ├── home/
 ├── tmp/
 └── identity.json
+
+/downloads/users/<subject-hash>/downloads/  # completed and partial downloads
 ```
 
 Each authenticated user receives an independent Motrix server and aria2
@@ -51,9 +53,9 @@ and IndexedDB are partitioned by the same opaque namespace.
 
 ## Supported input protocols
 
-Manual task creation accepts HTTP(S), FTP, SFTP, magnet links, Thunder links,
-and bare BitTorrent info hashes. Thunder links are decoded before submission,
-and bare info hashes are converted to magnet links. ED2K native downloading
-requires an ED2K-capable aria2 engine; the current VOS image uses the
-aria2-motrix engine, so ED2K UI exposure is intentionally kept behind the
-engine-upgrade boundary.
+Manual task creation accepts HTTP(S), SFTP, ED2K, BitTorrent magnet links,
+Thunder links, `.torrent` files, and bare BitTorrent info hashes. Thunder links
+are decoded before submission, `magnet://` is normalized to aria2-compatible
+`magnet:?`, and bare info hashes are converted to magnet links. The VOS image
+uses the same aria2-next engine lineage as Motrix Next and bundles ED2K
+bootstrap files.

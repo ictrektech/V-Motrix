@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/fetch-engine.mjs
 //
-// Fetch the bundled aria2 binary from a pinned `motrixapp/aria2` GitHub
+// Fetch the bundled aria2-compatible engine binary from a pinned GitHub
 // Release, verify it against an in-repo lockfile, and place it at exactly the
 // path the runtime resolves (`extra/<platform>/<arch>/<aria2c|aria2c.exe>`).
 //
@@ -32,11 +32,11 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..')
 const EXTRA_DIR = path.join(REPO_ROOT, 'extra')
 const LOCK_PATH = path.join(SCRIPT_DIR, 'engine.lock.json')
-const DEFAULT_REPO = 'motrixapp/aria2'
+const DEFAULT_REPO = 'AnInsomniacy/aria2-next'
 // Engine identifier recorded in the lockfile. This fetch tooling is
-// engine-agnostic by name; today it is configured for aria2. A future
-// self-built engine gets its own lockfile/config rather than a branch here.
-const ENGINE = 'aria2'
+// engine-agnostic by name; V-Motrix uses aria2-next so the Docker runtime has
+// the same ED2K-capable engine lineage as Motrix Next.
+const ENGINE = 'aria2-next'
 const GITHUB = 'https://github.com'
 
 export const EXIT_OK = 0
@@ -62,13 +62,27 @@ function resolveTimeoutMs() {
 // filename; note linux `arm` (Node arch) maps to `armv7l` (release label).
 // `key` is Node's `${process.platform}-${process.arch}`.
 const DESKTOP_TARGETS = [
-  { key: 'darwin-arm64', os: 'darwin', releaseArch: 'arm64', ext: 'tar.gz' },
-  { key: 'darwin-x64', os: 'darwin', releaseArch: 'x64', ext: 'tar.gz' },
-  { key: 'win32-x64', os: 'win32', releaseArch: 'x64', ext: 'zip' },
-  { key: 'win32-ia32', os: 'win32', releaseArch: 'ia32', ext: 'zip' },
-  { key: 'linux-x64', os: 'linux', releaseArch: 'x64', ext: 'tar.gz' },
-  { key: 'linux-arm64', os: 'linux', releaseArch: 'arm64', ext: 'tar.gz' },
-  { key: 'linux-arm', os: 'linux', releaseArch: 'armv7l', ext: 'tar.gz' },
+  {
+    key: 'darwin-arm64',
+    os: 'macos',
+    platform: 'darwin',
+    releaseArch: 'arm64',
+  },
+  { key: 'darwin-x64', os: 'macos', platform: 'darwin', releaseArch: 'x86_64' },
+  { key: 'win32-x64', os: 'windows', platform: 'win32', releaseArch: 'x86_64' },
+  {
+    key: 'win32-arm64',
+    os: 'windows',
+    platform: 'win32',
+    releaseArch: 'arm64',
+  },
+  { key: 'linux-x64', os: 'linux', platform: 'linux', releaseArch: 'x86_64' },
+  {
+    key: 'linux-arm64',
+    os: 'linux',
+    platform: 'linux',
+    releaseArch: 'aarch64',
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -260,6 +274,10 @@ export function resolveExtractCommand(archivePath, destDir, opts = {}) {
   return { command: 'tar', args: ['-xzf', archivePath, '-C', destDir] }
 }
 
+export function isDirectBinaryAsset(asset) {
+  return asset?.extract === false
+}
+
 // Extraction targets a temp dir; only the single binary entry is promoted
 // afterward. `io` (spawn/unzipAvailable) is injectable for tests.
 export function extractArchive(archivePath, destDir, io = {}) {
@@ -359,15 +377,20 @@ export async function installAsset(ctx, deps = defaultDeps) {
   // rename it no longer exists and the finally rm is a harmless no-op.
   let staging
   try {
-    const archivePath = path.join(workDir, asset.file)
-    await deps.writeFile(archivePath, archiveBytes)
-    await deps.extract(archivePath, workDir)
+    let binBytes
+    if (isDirectBinaryAsset(asset)) {
+      binBytes = archiveBytes
+    } else {
+      const archivePath = path.join(workDir, asset.file)
+      await deps.writeFile(archivePath, archiveBytes)
+      await deps.extract(archivePath, workDir)
 
-    const extractedBin = path.join(workDir, asset.bin)
-    if (!deps.fileExists(extractedBin)) {
-      throw new Error(`archive ${asset.file} did not contain ${asset.bin}`)
+      const extractedBin = path.join(workDir, asset.bin)
+      if (!deps.fileExists(extractedBin)) {
+        throw new Error(`archive ${asset.file} did not contain ${asset.bin}`)
+      }
+      binBytes = await deps.readFile(extractedBin)
     }
-    const binBytes = await deps.readFile(extractedBin)
     const binDigest = sha256Hex(binBytes)
     if (binDigest !== expectedBinary) {
       throw new Error(
@@ -410,14 +433,22 @@ export async function runWriteLock(args, existing, deps = defaultDeps) {
   }
   const version = tag.replace(/^v/, '')
 
-  const sumsUrl = `${GITHUB}/${repo}/releases/download/${tag}/SHA256SUMS`
+  const sumsFile =
+    existing?.sumsFile ??
+    (repo === DEFAULT_REPO
+      ? `aria2-next-${version}-checksums.sha256`
+      : 'SHA256SUMS')
+  const sumsUrl = `${GITHUB}/${repo}/releases/download/${tag}/${sumsFile}`
   deps.log(`[fetch-engine] write-lock: fetching SHA256SUMS for ${tag}`)
   const sums = parseSha256Sums((await deps.download(sumsUrl)).toString('utf8'))
 
   const assets = {}
   for (const target of DESKTOP_TARGETS) {
-    const bin = binaryName(target.os)
-    const file = `aria2c-${version}-${target.os}-${target.releaseArch}.${target.ext}`
+    const bin = binaryName(target.platform)
+    const file =
+      repo === DEFAULT_REPO
+        ? `aria2-next-${version}-${target.os}-${target.releaseArch}${target.platform === 'win32' ? '.exe' : ''}`
+        : `aria2c-${version}-${target.platform}-${target.releaseArch}.${target.ext}`
     const archiveSha256 = sums.get(file)
     if (!archiveSha256) {
       deps.logError(`[fetch-engine] SHA256SUMS is missing ${file}`)
@@ -432,20 +463,30 @@ export async function runWriteLock(args, existing, deps = defaultDeps) {
       )
       return EXIT_FAILURE
     }
-    const workDir = await deps.mkdtemp('aria2-lock-')
-    try {
-      const archivePath = path.join(workDir, file)
-      await deps.writeFile(archivePath, archiveBytes)
-      await deps.extract(archivePath, workDir)
-      const extractedBin = path.join(workDir, bin)
-      if (!deps.fileExists(extractedBin)) {
-        deps.logError(`[fetch-engine] ${file} did not contain ${bin}`)
-        return EXIT_FAILURE
+    const directBinary = repo === DEFAULT_REPO
+    let binarySha256 = archiveSha256
+    if (!directBinary) {
+      const workDir = await deps.mkdtemp('aria2-lock-')
+      try {
+        const archivePath = path.join(workDir, file)
+        await deps.writeFile(archivePath, archiveBytes)
+        await deps.extract(archivePath, workDir)
+        const extractedBin = path.join(workDir, bin)
+        if (!deps.fileExists(extractedBin)) {
+          deps.logError(`[fetch-engine] ${file} did not contain ${bin}`)
+          return EXIT_FAILURE
+        }
+        binarySha256 = sha256Hex(await deps.readFile(extractedBin))
+      } finally {
+        await deps.rm(workDir)
       }
-      const binarySha256 = sha256Hex(await deps.readFile(extractedBin))
-      assets[target.key] = { file, bin, archiveSha256, binarySha256 }
-    } finally {
-      await deps.rm(workDir)
+    }
+    assets[target.key] = {
+      file,
+      bin,
+      archiveSha256,
+      binarySha256,
+      ...(directBinary ? { extract: false } : {}),
     }
   }
 
@@ -471,6 +512,7 @@ export async function runWriteLock(args, existing, deps = defaultDeps) {
     repo,
     tag,
     version,
+    sumsFile,
     assets,
   })
   deps.log(

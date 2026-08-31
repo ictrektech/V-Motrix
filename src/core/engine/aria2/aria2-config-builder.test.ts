@@ -357,6 +357,25 @@ describe('Aria2ConfigBuilder', () => {
       )
     })
 
+    it('passes managed ED2K bootstrap lists when configured', () => {
+      builder = new Aria2ConfigBuilder(
+        '/app/extra/aria2.conf',
+        '/home/user/.config/motrix',
+        { ed2kBootstrapDir: '/app/extra/ed2k-bootstrap' }
+      )
+      const args = buildArgs(DEFAULT_ENGINE_SETTINGS, false, null, {
+        download: 0,
+        upload: 0,
+      })
+
+      expect(args).toContain(
+        '--ed2k-server-list=/app/extra/ed2k-bootstrap/server.met'
+      )
+      expect(args).toContain(
+        '--ed2k-node-list=/app/extra/ed2k-bootstrap/nodes.dat'
+      )
+    })
+
     it('uses custom settings values', () => {
       const custom: EngineSettings = {
         ...DEFAULT_ENGINE_SETTINGS,

@@ -69,8 +69,8 @@ require_cmd tar
 [[ -r "$FEISHU_CONFIG_FILE" ]] || die "Feishu config not readable: $FEISHU_CONFIG_FILE"
 
 prefetch_engine() {
-  local engine_arch key metadata repo tag archive_name binary_name archive_sha binary_sha
-  local work_dir archive_path source_url destination
+  local engine_arch key metadata repo tag archive_name binary_name archive_sha binary_sha extract
+  local work_dir archive_path source_url destination engine_path
   case "$ARCH" in
     amd64) engine_arch="x64" ;;
     arm64) engine_arch="arm64" ;;
@@ -81,10 +81,10 @@ import json, sys
 with open('scripts/engine.lock.json', encoding='utf-8') as handle:
     lock = json.load(handle)
 asset = lock['assets'][sys.argv[1]]
-print('\t'.join((lock['repo'], lock['tag'], asset['file'], asset['bin'], asset['archiveSha256'], asset['binarySha256'])))
+print('\t'.join((lock['repo'], lock['tag'], asset['file'], asset['bin'], asset['archiveSha256'], asset['binarySha256'], str(asset.get('extract', True)).lower())))
 PY
 )"
-  IFS=$'\t' read -r repo tag archive_name binary_name archive_sha binary_sha <<< "$metadata"
+  IFS=$'\t' read -r repo tag archive_name binary_name archive_sha binary_sha extract <<< "$metadata"
   destination="extra/linux/${engine_arch}/${binary_name}"
   if [[ -f "$destination" ]] && python3 - "$destination" "$binary_sha" <<'PY'
 import hashlib, pathlib, sys
@@ -108,15 +108,20 @@ actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
 if actual != sys.argv[2].lower():
     raise SystemExit(f'aria2 archive digest mismatch: expected={sys.argv[2].lower()} actual={actual}')
 PY
-  tar -xzf "$archive_path" -C "$work_dir"
-  python3 - "${work_dir}/${binary_name}" "$binary_sha" <<'PY'
+  if [[ "$extract" == "false" ]]; then
+    engine_path="$archive_path"
+  else
+    tar -xzf "$archive_path" -C "$work_dir"
+    engine_path="${work_dir}/${binary_name}"
+  fi
+  python3 - "$engine_path" "$binary_sha" <<'PY'
 import hashlib, pathlib, sys
 actual = hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest()
 if actual != sys.argv[2].lower():
     raise SystemExit(f'aria2 binary digest mismatch: expected={sys.argv[2].lower()} actual={actual}')
 PY
   mkdir -p "$(dirname "$destination")"
-  install -m 0755 "${work_dir}/${binary_name}" "$destination"
+  install -m 0755 "$engine_path" "$destination"
   rm -rf "$work_dir"
   trap - RETURN
   log "Verified aria2 engine: $destination"
