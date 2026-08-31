@@ -13,11 +13,11 @@ x-v-motrix-base: &v-motrix-base
     VOS_PUBLIC_BASE_PATH: /app/com.ictrek.v-motrix
     VOS_APP_VERSION: "__APP_VERSION__"
   volumes:
-    - ${VOS_APP_STORAGE_PATH}/data:/data
+    - ${VOS_APP_STORAGE_PATH}:/data
   labels:
     - "traefik.enable=true"
     - "traefik.docker.network=vos_default"
-    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.rule=PathPrefix(`/app/com.ictrek.v-motrix`) && HeadersRegexp(`Sec-Fetch-Dest`, `document`)"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.rule=PathPrefix(`/app/com.ictrek.v-motrix`) && HeaderRegexp(`Sec-Fetch-Dest`, `document`)"
     - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.priority=1000"
     - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.service=${COMPOSE_PROJECT_NAME:-v-motrix}-web"
     - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-v-motrix}-top-open.middlewares=${COMPOSE_PROJECT_NAME:-v-motrix}-top-open-redirect"

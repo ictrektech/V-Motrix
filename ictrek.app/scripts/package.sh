@@ -73,7 +73,7 @@ with tarfile.open(inner_path, 'r:gz') as inner:
         raise SystemExit('compose contains a non-registry image')
     checks = [
         ('external: true', compose), ('aliases:', compose),
-        ('HeadersRegexp(`Sec-Fetch-Dest`, `document`)', compose),
+        ('HeaderRegexp(`Sec-Fetch-Dest`, `document`)', compose),
         (f'basePath: /app/{app_id}', manifest), ('oauth2:', manifest),
         ('storage:', manifest), ('id: com-ictrek-v-motrix', routers),
         ('id: downloads', routers), (f'iframe-src: /app/{app_id}/', routers),

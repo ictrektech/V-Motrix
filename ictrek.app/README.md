@@ -30,7 +30,7 @@ the package to VOS App Store.
 
 ## Storage and user isolation
 
-The package mounts `${VOS_APP_STORAGE_PATH}/data` at `/data`; there is no
+The package mounts `${VOS_APP_STORAGE_PATH}` at `/data`; there is no
 install-time public download-directory selector. VOS OIDC Fastpath maps every
 immutable user subject to an opaque directory:
 
