@@ -38,12 +38,14 @@ COPY . .
 RUN ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
     node node_modules/electron/install.js
 RUN --mount=type=cache,id=v-motrix-builtins,target=/app/node_modules/.cache/motrix-builtins \
+    --mount=type=cache,id=v-motrix-engine,target=/app/extra/linux \
     case "${TARGETARCH}" in \
       amd64) engine_arch=x64 ;; \
       arm64) engine_arch=arm64 ;; \
       *) echo "unsupported Docker target architecture: ${TARGETARCH}" >&2; exit 2 ;; \
     esac \
- && node scripts/fetch-engine.mjs --platform linux --arch "${engine_arch}" \
+ && MOTRIX_ENGINE_FETCH_TIMEOUT_MS=120000 \
+    node scripts/fetch-engine.mjs --platform linux --arch "${engine_arch}" \
  && pnpm run check:third-party-notices \
  && MOTRIX_WEB_BASE_PATH="${VOS_BASE_PATH}" pnpm run build:server \
  && node scripts/stage-server-app.mjs --platform linux --arch "${TARGETARCH}" --libc musl --strict \
