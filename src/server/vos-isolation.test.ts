@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { rewritePaths, userFromPayload } from './vos-isolation'
+import {
+  rewritePaths,
+  safeDownloadSegment,
+  userFromPayload,
+} from './vos-isolation'
 
 describe('VOS user isolation', () => {
   it('derives stable, opaque, distinct namespaces from immutable subjects', () => {
@@ -38,6 +42,21 @@ describe('VOS user isolation', () => {
       defaultSaveDir: '/downloads',
       tasks: [{ saveDir: '/downloads/linux' }, { saveDir: bobRoot }],
     })
+  })
+
+  it('uses the visible username for the public download directory segment', () => {
+    const admin = userFromPayload({
+      sub: '330abf1f99b54c63a1f82f0ffaa3f437',
+      preferred_username: 'admin',
+    })
+    const unsafe = userFromPayload({
+      sub: 'user-with-unsafe-name',
+      preferred_username: '../alice/downloads',
+    })
+
+    expect(safeDownloadSegment(admin)).toBe('admin')
+    expect(safeDownloadSegment(unsafe)).toBe('.._alice_downloads')
+    expect(safeDownloadSegment(admin)).not.toBe(admin.namespace)
   })
 
   it('maps the public alias back only inside the current user root', () => {

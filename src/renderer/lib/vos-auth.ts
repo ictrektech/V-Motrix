@@ -184,7 +184,47 @@ export async function bootstrapVosSession(): Promise<VosSessionUser | null> {
     if (user) return user
   }
   if (config.authenticated && config.user) return config.user
-  throw new Error('VOS OIDC Fastpath is unavailable')
+  return null
+}
+
+function memoryStorage(): Storage {
+  const items = new Map<string, string>()
+  return {
+    get length() {
+      return items.size
+    },
+    clear() {
+      items.clear()
+    },
+    getItem(key: string) {
+      return items.get(key) ?? null
+    },
+    key(index: number) {
+      return [...items.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      items.delete(key)
+    },
+    setItem(key: string, value: string) {
+      items.set(key, value)
+    },
+  }
+}
+
+function browserStorage(name: 'localStorage' | 'sessionStorage'): Storage {
+  try {
+    return window[name]
+  } catch {
+    return memoryStorage()
+  }
+}
+
+function browserIndexedDB(): IDBFactory | null {
+  try {
+    return indexedDB
+  } catch {
+    return null
+  }
 }
 
 function scopedStorage(source: Storage, prefix: string): Storage {
@@ -233,25 +273,30 @@ export function installVosStoragePartition(namespace: string): void {
     throw new Error('Invalid VOS storage namespace')
   }
   const prefix = `v-motrix:${namespace}:`
-  installProperty('localStorage', scopedStorage(localStorage, prefix))
-  installProperty('sessionStorage', scopedStorage(sessionStorage, prefix))
-  const database = indexedDB
+  installProperty('localStorage', scopedStorage(browserStorage('localStorage'), prefix))
   installProperty(
-    'indexedDB',
-    new Proxy(database, {
-      get(target, property) {
-        if (property === 'open') {
-          return (name: string, version?: number) =>
-            version === undefined
-              ? target.open(`${prefix}${name}`)
-              : target.open(`${prefix}${name}`, version)
-        }
-        if (property === 'deleteDatabase') {
-          return (name: string) => target.deleteDatabase(`${prefix}${name}`)
-        }
-        const value = Reflect.get(target, property, target)
-        return typeof value === 'function' ? value.bind(target) : value
-      },
-    })
+    'sessionStorage',
+    scopedStorage(browserStorage('sessionStorage'), prefix)
   )
+  const database = browserIndexedDB()
+  if (database) {
+    installProperty(
+      'indexedDB',
+      new Proxy(database, {
+        get(target, property) {
+          if (property === 'open') {
+            return (name: string, version?: number) =>
+              version === undefined
+                ? target.open(`${prefix}${name}`)
+                : target.open(`${prefix}${name}`, version)
+          }
+          if (property === 'deleteDatabase') {
+            return (name: string) => target.deleteDatabase(`${prefix}${name}`)
+          }
+          const value = Reflect.get(target, property, target)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    )
+  }
 }

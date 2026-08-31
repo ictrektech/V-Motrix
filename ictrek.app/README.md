@@ -33,7 +33,8 @@ the package to VOS App Store.
 The package mounts `${VOS_APP_STORAGE_PATH}` at `/data` for app state and
 `${VOS_MOTRIX_DOWNLOAD_PUBLIC_PATH:-/data/vos_workspace/v-motrix/downloads}`
 at `/downloads` for downloaded files. VOS OIDC Fastpath maps every immutable
-user subject to opaque directories:
+user subject to opaque private directories while downloaded files are grouped
+by the visible VOS username:
 
 ```text
 /data/users/<subject-hash>/                 # private app state
@@ -42,14 +43,15 @@ user subject to opaque directories:
 ├── tmp/
 └── identity.json
 
-/downloads/users/<subject-hash>/downloads/  # completed and partial downloads
+/downloads/<username>/                      # completed and partial downloads
 ```
 
 Each authenticated user receives an independent Motrix server and aria2
-process. Request/response and WebSocket boundaries map the private physical
-download root to `/downloads`, so the default path never reveals the subject
-hash, username, or host storage path. Browser localStorage, sessionStorage,
-and IndexedDB are partitioned by the same opaque namespace.
+process. Request/response and WebSocket boundaries keep private app state under
+the opaque subject hash, while the default download path uses
+`/downloads/<username>` so users can find files directly in VOS file
+management. Browser localStorage, sessionStorage, and IndexedDB are partitioned
+by the same opaque namespace.
 
 ## Supported input protocols
 

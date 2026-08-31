@@ -1,6 +1,7 @@
 import { createHashRouter, Navigate, type RouteObject } from 'react-router'
 import { AppLayout } from './layouts/app-layout'
 import type { RouteHandle } from './router-types'
+import { DashboardPage } from './routes/dashboard/dashboard-page'
 import { DownloadsPage } from './routes/downloads/downloads-page'
 import { NotificationsPage } from './routes/notifications/notifications-page'
 import { PluginDetailPage } from './routes/plugins/plugin-detail-page'
@@ -16,7 +17,12 @@ const routes = [
     children: [
       {
         index: true,
-        element: <Navigate to="downloads/all" replace />,
+        element: <Navigate to="dashboard" replace />,
+        handle: { transparentInset: true } satisfies RouteHandle,
+      },
+      {
+        path: 'dashboard',
+        element: <DashboardPage />,
         handle: { transparentInset: true } satisfies RouteHandle,
       },
       {

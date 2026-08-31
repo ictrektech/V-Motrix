@@ -28,6 +28,28 @@ const SIDEBAR_WIDTH_MOBILE = '18rem'
 const SIDEBAR_WIDTH_ICON = '3rem'
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b'
 
+function readSidebarState(): boolean | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_STATE_KEY)
+    if (stored === 'true') return true
+    if (stored === 'false') return false
+  } catch {
+    return null
+  }
+  return null
+}
+
+function writeSidebarState(open: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIDEBAR_STATE_KEY, String(open))
+  } catch {
+    // VOS may sandbox embedded apps without storage access. Sidebar state is
+    // cosmetic, so keep rendering instead of failing the whole app.
+  }
+}
+
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed'
   open: boolean
@@ -70,11 +92,7 @@ function SidebarProvider({
   // The renderer is Electron CSR-only, so localStorage replaces the
   // cookie shadcn uses for Next.js SSR hydration.
   const [_open, _setOpen] = React.useState(() => {
-    if (typeof window === 'undefined') return defaultOpen
-    const stored = window.localStorage.getItem(SIDEBAR_STATE_KEY)
-    if (stored === 'true') return true
-    if (stored === 'false') return false
-    return defaultOpen
+    return readSidebarState() ?? defaultOpen
   })
   const open = openProp ?? _open
   const setOpen = React.useCallback(
@@ -85,7 +103,7 @@ function SidebarProvider({
       } else {
         _setOpen(openState)
       }
-      window.localStorage.setItem(SIDEBAR_STATE_KEY, String(openState))
+      writeSidebarState(openState)
     },
     [setOpenProp, open]
   )

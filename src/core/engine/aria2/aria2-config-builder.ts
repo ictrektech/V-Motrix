@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { access, copyFile, mkdir, rename } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -185,7 +186,12 @@ export class Aria2ConfigBuilder {
       `--dht-file-path6=${this.dht6FilePath}`,
       `--save-session=${this.saveSessionPath}`
     )
-    if (this.ed2kServerListPath && this.ed2kNodeListPath) {
+    if (
+      this.ed2kServerListPath &&
+      this.ed2kNodeListPath &&
+      existsSync(this.ed2kServerListPath) &&
+      existsSync(this.ed2kNodeListPath)
+    ) {
       args.push(
         `--ed2k-server-list=${this.ed2kServerListPath}`,
         `--ed2k-node-list=${this.ed2kNodeListPath}`

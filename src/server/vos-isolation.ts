@@ -48,6 +48,14 @@ export function userFromPayload(payload: unknown): VosUser {
   return Object.freeze({ subject, username, namespace })
 }
 
+export function safeDownloadSegment(user: VosUser): string {
+  const normalized = user.username
+    .trim()
+    .replace(/[\/\\\0]/g, '_')
+    .replace(/^\.+$/, '')
+  return normalized || user.namespace
+}
+
 export function rewritePaths(
   value: unknown,
   from: string,

@@ -30,7 +30,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { to: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard', end: true },
+  { to: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { to: '/downloads', icon: Download, labelKey: 'nav.downloads' },
   { to: '/trackers', icon: RadioTower, labelKey: 'nav.trackers' },
   { to: '/plugins', icon: ToyBrick, labelKey: 'nav.plugins' },

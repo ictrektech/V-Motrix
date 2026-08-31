@@ -302,6 +302,35 @@ async function main() {
     }
   )
   await settingsManager.load()
+  const vosEnginePortOverrides: {
+    rpcPort?: number
+    listenPort?: number
+    dhtListenPort?: number
+  } = {}
+  if (process.env.MOTRIX_ARIA2_RPC_PORT?.trim()) {
+    vosEnginePortOverrides.rpcPort = parseServerPort(
+      process.env.MOTRIX_ARIA2_RPC_PORT,
+      'MOTRIX_ARIA2_RPC_PORT',
+      16800
+    )
+  }
+  if (process.env.MOTRIX_LISTEN_PORT?.trim()) {
+    vosEnginePortOverrides.listenPort = parseServerPort(
+      process.env.MOTRIX_LISTEN_PORT,
+      'MOTRIX_LISTEN_PORT',
+      6881
+    )
+  }
+  if (process.env.MOTRIX_DHT_LISTEN_PORT?.trim()) {
+    vosEnginePortOverrides.dhtListenPort = parseServerPort(
+      process.env.MOTRIX_DHT_LISTEN_PORT,
+      'MOTRIX_DHT_LISTEN_PORT',
+      6881
+    )
+  }
+  if (Object.keys(vosEnginePortOverrides).length > 0) {
+    await settingsManager.update({ engine: vosEnginePortOverrides })
+  }
   if (!shellAsyncWork.isAccepting()) return
   const activeGeoipManager = new GeoIPManager({
     settingsManager,

@@ -1,15 +1,21 @@
 import { type ChildProcess, spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { access, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import http, {
   type IncomingHttpHeaders,
   type IncomingMessage,
   type ServerResponse,
 } from 'node:http'
+import { createServer as createNetServer } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import WebSocket, { type RawData, WebSocketServer } from 'ws'
-import { rewritePaths, userFromPayload, type VosUser } from './vos-isolation'
+import {
+  rewritePaths,
+  safeDownloadSegment,
+  userFromPayload,
+  type VosUser,
+} from './vos-isolation'
 
 const PORT = parsePort(process.env.PORT, 8080)
 const DATA_ROOT = path.resolve(process.env.VOS_MOTRIX_DATA_ROOT || '/data')
@@ -23,6 +29,9 @@ const RENDERER_ROOT = path.resolve(
 const USERINFO_URL =
   process.env.VOS_OIDC_USERINFO_URL?.trim() ||
   'http://172.17.0.1:8105/v1000/oauth2/userinfo'
+const USER_CHECK_URL =
+  process.env.VOS_USER_CHECK_URL?.trim() ||
+  'http://172.17.0.1:8105/v1000/user/check'
 const CLIENT_ID =
   process.env.VOS_OIDC_CLIENT_ID?.trim() || 'com.ictrek.v-motrix'
 const OIDC_SCOPE = process.env.VOS_OIDC_SCOPE?.trim() || 'openid profile email'
@@ -41,6 +50,7 @@ interface ChildRuntime {
   readonly port: number
   readonly operatorToken: string
   readonly downloadRoot: string
+  readonly virtualDownloadRoot: string
 }
 
 interface SessionRecord {
@@ -49,6 +59,7 @@ interface SessionRecord {
 }
 
 const sessions = new Map<string, SessionRecord>()
+const requestIdentities = new Map<string, SessionRecord>()
 const children = new Map<string, Promise<ChildRuntime>>()
 const websocketServer = new WebSocketServer({ noServer: true })
 
@@ -117,6 +128,97 @@ async function verifyAccessToken(accessToken: string): Promise<VosUser> {
   return userFromPayload(await response.json())
 }
 
+function claim(value: unknown, ...names: string[]): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+  const record = value as Record<string, unknown>
+  for (const name of names) {
+    const candidate = record[name]
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim()
+    }
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return String(candidate)
+    }
+  }
+  return ''
+}
+
+function userFromVosCheckPayload(payload: unknown): VosUser {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('invalid VOS user check response')
+  }
+  const outer = payload as Record<string, unknown>
+  if (typeof outer.code === 'number' && outer.code !== 0) {
+    throw new Error(`VOS rejected request (code ${outer.code})`)
+  }
+  const data =
+    outer.data && typeof outer.data === 'object' && !Array.isArray(outer.data)
+      ? (outer.data as Record<string, unknown>)
+      : outer
+  const user =
+    data.user && typeof data.user === 'object' && !Array.isArray(data.user)
+      ? (data.user as Record<string, unknown>)
+      : {}
+  const subject =
+    claim(user, 'sub', 'id', 'user_id', 'uid') ||
+    claim(data, 'sub', 'id', 'user_id', 'uid') ||
+    claim(outer, 'sub', 'id', 'user_id', 'uid')
+  const username =
+    claim(user, 'preferred_username', 'username', 'name', 'nickname', 'email') ||
+    claim(data, 'preferred_username', 'username', 'name', 'nickname', 'email') ||
+    claim(outer, 'preferred_username', 'username', 'name', 'nickname', 'email')
+  return userFromPayload({ sub: subject, preferred_username: username })
+}
+
+function requestIdentityCacheKey(request: IncomingMessage): string | null {
+  const authorization = request.headers.authorization
+  const cookie = request.headers.cookie
+  const raw = `${Array.isArray(authorization) ? authorization.join(',') : authorization || ''}\n${cookie || ''}`
+  if (!raw.trim()) return null
+  return createHash('sha256').update(raw).digest('hex')
+}
+
+async function verifyRequestIdentity(
+  request: IncomingMessage
+): Promise<VosUser | null> {
+  const cacheKey = requestIdentityCacheKey(request)
+  if (cacheKey) {
+    const cached = requestIdentities.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      cached.expiresAt = Date.now() + SESSION_TTL_MS
+      return cached.user
+    }
+  }
+  const headers: Record<string, string> = { accept: 'application/json' }
+  if (request.headers.authorization) {
+    headers.authorization = Array.isArray(request.headers.authorization)
+      ? request.headers.authorization[0] || ''
+      : request.headers.authorization
+  }
+  if (request.headers.cookie) headers.cookie = request.headers.cookie
+  if (!headers.authorization && !headers.cookie) return null
+
+  try {
+    const response = await fetch(USER_CHECK_URL, {
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!response.ok) return null
+    const user = userFromVosCheckPayload(await response.json())
+    await persistIdentity(user)
+    await childFor(user)
+    if (cacheKey) {
+      requestIdentities.set(cacheKey, {
+        user,
+        expiresAt: Date.now() + SESSION_TTL_MS,
+      })
+    }
+    return user
+  } catch {
+    return null
+  }
+}
+
 function parseCookies(header: string | undefined): Map<string, string> {
   const result = new Map<string, string>()
   for (const part of (header ?? '').split(';')) {
@@ -144,6 +246,15 @@ function sessionFor(request: IncomingMessage): SessionRecord | null {
   }
   found.expiresAt = Date.now() + SESSION_TTL_MS
   return found
+}
+
+async function sessionOrVosIdentityFor(
+  request: IncomingMessage
+): Promise<SessionRecord | null> {
+  const existing = sessionFor(request)
+  if (existing) return existing
+  const user = await verifyRequestIdentity(request)
+  return user ? { user, expiresAt: Date.now() + SESSION_TTL_MS } : null
 }
 
 function requestIsSecure(request: IncomingMessage): boolean {
@@ -183,7 +294,11 @@ function userRoot(user: VosUser): string {
 }
 
 function userDownloadRoot(user: VosUser): string {
-  return path.join(DOWNLOAD_ROOT, 'users', user.namespace, 'downloads')
+  return path.join(DOWNLOAD_ROOT, safeDownloadSegment(user))
+}
+
+function userVirtualDownloadRoot(user: VosUser): string {
+  return path.posix.join(VIRTUAL_DOWNLOAD_ROOT, safeDownloadSegment(user))
 }
 
 async function persistIdentity(user: VosUser): Promise<void> {
@@ -219,10 +334,30 @@ function readyMessage(value: unknown): value is {
   )
 }
 
+async function reserveTcpPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createNetServer()
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('could not reserve TCP port')))
+        return
+      }
+      const port = address.port
+      server.close((error) => {
+        if (error) reject(error)
+        else resolve(port)
+      })
+    })
+  })
+}
+
 async function startChild(user: VosUser): Promise<ChildRuntime> {
   const root = userRoot(user)
   const appData = path.join(root, 'app')
   const downloads = userDownloadRoot(user)
+  const virtualDownloads = userVirtualDownloadRoot(user)
   const home = path.join(root, 'home')
   const temp = path.join(root, 'tmp')
   await Promise.all(
@@ -232,11 +367,21 @@ async function startChild(user: VosUser): Promise<ChildRuntime> {
   )
   await mkdir(downloads, { recursive: true, mode: 0o755 })
   const operatorToken = randomBytes(32).toString('base64url')
+  const [aria2RpcPort, listenPort, dhtListenPort, mdxpPort] =
+    await Promise.all([
+      reserveTcpPort(),
+      reserveTcpPort(),
+      reserveTcpPort(),
+      reserveTcpPort(),
+    ])
   const child = spawn(process.execPath, [serverEntry], {
     env: {
       ...process.env,
       HOME: home,
       PORT: '0',
+      MOTRIX_ARIA2_RPC_PORT: String(aria2RpcPort),
+      MOTRIX_LISTEN_PORT: String(listenPort),
+      MOTRIX_DHT_LISTEN_PORT: String(dhtListenPort),
       MOTRIX_DATA_DIR: appData,
       MOTRIX_TEMP_DIR: temp,
       MOTRIX_PLUGIN_DIR: path.join(appData, 'plugins'),
@@ -244,7 +389,7 @@ async function startChild(user: VosUser): Promise<ChildRuntime> {
       MOTRIX_ALLOWED_SAVE_DIRS: downloads,
       MOTRIX_OPERATOR_TOKEN: operatorToken,
       MOTRIX_MDXP_HOST: '127.0.0.1',
-      MOTRIX_MDXP_PORT: '0',
+      MOTRIX_MDXP_PORT: String(mdxpPort),
     },
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   })
@@ -277,7 +422,13 @@ async function startChild(user: VosUser): Promise<ChildRuntime> {
   child.once('exit', () => {
     children.delete(user.namespace)
   })
-  return { child, port, operatorToken, downloadRoot: downloads }
+  return {
+    child,
+    port,
+    operatorToken,
+    downloadRoot: downloads,
+    virtualDownloadRoot: virtualDownloads,
+  }
 }
 
 function childFor(user: VosUser): Promise<ChildRuntime> {
@@ -327,7 +478,7 @@ async function proxyHttp(
   const body = isJson
     ? rewriteJsonBuffer(
         await readBody(request, MAX_JSON_PROXY_BYTES),
-        VIRTUAL_DOWNLOAD_ROOT,
+        runtime.virtualDownloadRoot,
         runtime.downloadRoot
       )
     : null
@@ -355,7 +506,7 @@ async function proxyHttp(
               rewriteJsonBuffer(
                 raw,
                 runtime.downloadRoot,
-                VIRTUAL_DOWNLOAD_ROOT
+                runtime.virtualDownloadRoot
               )
             )
             .then((mapped) => {
@@ -547,7 +698,7 @@ const server = http.createServer((request, response) => {
       await serveStatic(request, response, pathname)
       return
     }
-    const found = sessionFor(request)
+    const found = await sessionOrVosIdentityFor(request)
     if (!found) {
       json(response, 401, { error: 'VOS authentication required' })
       return
@@ -592,7 +743,7 @@ server.on('upgrade', (request, socket, head) => {
       socket.destroy()
       return
     }
-    const found = sessionFor(request)
+    const found = await sessionOrVosIdentityFor(request)
     if (!found) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
       socket.destroy()
@@ -611,7 +762,11 @@ server.on('upgrade', (request, socket, head) => {
           return
         }
         upstream.send(
-          mapWebSocketData(data, VIRTUAL_DOWNLOAD_ROOT, runtime.downloadRoot),
+          mapWebSocketData(
+            data,
+            runtime.virtualDownloadRoot,
+            runtime.downloadRoot
+          ),
           { binary }
         )
       })
@@ -620,7 +775,7 @@ server.on('upgrade', (request, socket, head) => {
           upstream.send(
             mapWebSocketData(
               message.data,
-              VIRTUAL_DOWNLOAD_ROOT,
+              runtime.virtualDownloadRoot,
               runtime.downloadRoot
             ),
             { binary: message.binary }
@@ -630,7 +785,11 @@ server.on('upgrade', (request, socket, head) => {
       upstream.on('message', (data, binary) => {
         if (client.readyState !== WebSocket.OPEN) return
         client.send(
-          mapWebSocketData(data, runtime.downloadRoot, VIRTUAL_DOWNLOAD_ROOT),
+          mapWebSocketData(
+            data,
+            runtime.downloadRoot,
+            runtime.virtualDownloadRoot
+          ),
           { binary }
         )
       })

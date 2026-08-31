@@ -57,10 +57,21 @@ describe('isMotrixFork', () => {
         buildFeatureReport('1.37.0-motrix.10', ['SQLite3-Persistence'])
       )
     ).toBe(true)
-    expect(
-      isMotrixFork(buildFeatureReport('1.37.0', ['SQLite3-Persistence']))
-    ).toBe(false)
     expect(isMotrixFork(buildFeatureReport('1.37.0-motrix.10', []))).toBe(false)
+  })
+
+  it('accepts Aria2 Next semver releases as the maintained Motrix Next engine', () => {
+    expect(
+      isMotrixFork(
+        buildFeatureReport('2.6.8', [
+          'BitTorrent',
+          'ED2K',
+          'Metalink',
+          'XML-RPC',
+          'SFTP',
+        ])
+      )
+    ).toBe(true)
   })
 })
 

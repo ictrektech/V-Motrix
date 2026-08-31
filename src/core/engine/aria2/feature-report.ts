@@ -15,8 +15,19 @@ export const STANDARD_ARIA2_CONNECTION_LIMIT = 16
  * feature token confirms the fork-only persistence capability is present.
  */
 export function isMotrixFork(
-  report: Pick<EngineFeatureReport, 'version' | 'hasSqlitePersistence'>
+  report: Pick<
+    EngineFeatureReport,
+    'version' | 'features' | 'hasSqlitePersistence'
+  >
 ): boolean {
+  if (
+    semverGte(report.version, '2.0.0') &&
+    report.features.includes('BitTorrent') &&
+    report.features.includes('ED2K') &&
+    report.features.includes('XML-RPC')
+  ) {
+    return true
+  }
   return (
     /^\d+\.\d+\.\d+-motrix\.\d+$/i.test(report.version) &&
     report.hasSqlitePersistence
