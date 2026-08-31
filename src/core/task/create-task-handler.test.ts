@@ -547,6 +547,55 @@ describe('handleCreateTask', () => {
     })
   })
 
+  it('keeps sftp direct downloads on the FTP task family', async () => {
+    const deps = makeDeps({ addUriGid: 'gid-sftp' })
+    await handleCreateTask(
+      {
+        type: 'http',
+        uris: ['sftp://example.com/file.zip'],
+        saveDir: '/d',
+        headers: [],
+      },
+      deps
+    )
+    expect(deps.addUri).toHaveBeenCalledWith(
+      ['sftp://example.com/file.zip'],
+      expect.objectContaining({ dir: '/d' })
+    )
+    expect(lastAddedTask(deps).type).toBe(TaskType.Ftp)
+  })
+
+  it('does not run HTTP-only plugin hooks for ftp-family direct downloads', async () => {
+    const deps = makeDeps({ addUriGid: 'gid-ftp' })
+    const runBeforeCreateHttp = vi.fn()
+    deps.orchestrator = {
+      runBeforeCreateHttp,
+    } as unknown as Deps['orchestrator']
+    deps.directResourceValidator = {
+      probe: vi.fn(),
+      capture: vi.fn(),
+    }
+    await handleCreateTask(
+      {
+        type: 'http',
+        uris: ['ftp://example.com/file.zip'],
+        saveDir: '/d',
+        headers: [],
+      },
+      deps
+    )
+    expect(runBeforeCreateHttp).not.toHaveBeenCalled()
+    expect(deps.directResourceValidator.probe).not.toHaveBeenCalled()
+    expect(deps.directResourceValidator.capture).not.toHaveBeenCalled()
+    expect(lastAddedTask(deps).instances[0]?.payload).toEqual({
+      directReplay: {
+        version: 1,
+        requestModifiers: [],
+        replayability: 'uri-only',
+      },
+    })
+  })
+
   it('persists a captured validator for a public direct download', async () => {
     const deps = makeDeps()
     const resourceValidator = {

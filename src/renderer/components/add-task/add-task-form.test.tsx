@@ -107,6 +107,24 @@ describe('AddTaskForm', () => {
     )
   })
 
+  it('normalizes Motrix Next resource forms from clipboard autofill', async () => {
+    const thunder = `thunder://${Buffer.from(
+      'AAhttps://example.com/f.zipZZ',
+      'utf8'
+    )
+      .toString('base64')
+      .replace(/=+$/u, '')}`
+    vi.mocked(mockServices.readClipboard).mockResolvedValue(
+      `${thunder}\n${'a'.repeat(40)}`
+    )
+    renderForm()
+    await waitFor(() =>
+      expect(screen.getByRole('textbox')).toHaveValue(
+        `https://example.com/f.zip\nmagnet:?xt=urn:btih:${'a'.repeat(40)}`
+      )
+    )
+  })
+
   it('only reads the clipboard after a precreated window is shown', async () => {
     vi.mocked(mockServices.readClipboard).mockResolvedValue(
       'https://example.com/after-show.zip'

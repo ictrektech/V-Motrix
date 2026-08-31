@@ -285,6 +285,47 @@ describe('createProtocolManager', () => {
       })
     })
 
+    it('opens add-task window with normalized Motrix Next resources', () => {
+      const {
+        getWindow,
+        settingsManager,
+        torrentParser,
+        onOpenAddTask,
+        deliverToAddTask,
+        onOpenPluginDetail,
+      } = makeDeps()
+      const pm = createProtocolManager({
+        getWindow,
+        settingsManager,
+        torrentParser,
+        onOpenAddTask,
+        deliverToAddTask,
+        onOpenPluginDetail,
+      })
+      const thunder = `thunder://${Buffer.from(
+        'AAhttps://example.com/file.zipZZ',
+        'utf8'
+      )
+        .toString('base64')
+        .replace(/=+$/u, '')}`
+      pm.handle(thunder)
+      pm.handle('sftp://example.com/file.zip')
+      pm.handle('a'.repeat(40))
+
+      expect(onOpenAddTask).toHaveBeenNthCalledWith(1, {
+        mode: 'links',
+        url: 'https://example.com/file.zip',
+      })
+      expect(onOpenAddTask).toHaveBeenNthCalledWith(2, {
+        mode: 'links',
+        url: 'sftp://example.com/file.zip',
+      })
+      expect(onOpenAddTask).toHaveBeenNthCalledWith(3, {
+        mode: 'links',
+        url: `magnet:?xt=urn:btih:${'a'.repeat(40)}`,
+      })
+    })
+
     it('decodes motrix://new-task?uri=<http-url> and opens add-task', () => {
       const {
         getWindow,

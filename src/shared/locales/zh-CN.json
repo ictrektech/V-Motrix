@@ -825,6 +825,7 @@
       },
       "errors": {
         "urlsRequired": "至少需要一个 URL",
+        "invalidUrl": "URL 必须是 http、https、ftp、sftp、magnet、thunder 或 BitTorrent 信息哈希",
         "saveDirRequired": "必须指定保存目录",
         "noFilesSelected": "请至少选择一个文件",
         "missingSource": "需要种子文件或 magnet 链接"

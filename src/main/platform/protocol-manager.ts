@@ -4,6 +4,10 @@ import { getLogger } from '@core/logger'
 import type { SettingsManager } from '@core/settings/settings-manager'
 import type { TorrentParser } from '@core/torrent/torrent-parser'
 import { Events } from '@shared/protocol/events'
+import {
+  isDownloadableResourceUri,
+  normalizeResourceUriLine,
+} from '@shared/protocol/resource-uri'
 import type { AddTaskUrlParams } from '@shared/schemas/add-task'
 import { REGISTRY_PLUGIN_ID_RE } from '@shared/schemas/registry'
 import type { BrowserWindow } from 'electron'
@@ -47,21 +51,11 @@ interface TorrentPayload {
   dataBase64: string
 }
 
-const RESOURCE_PREFIXES = ['magnet:', 'http:', 'https:', 'ftp:']
-
 function uriToAddTaskParams(url: string): AddTaskUrlParams | null {
-  const lower = url.toLowerCase()
-  if (lower.startsWith('magnet:')) {
-    return { mode: 'links', url }
-  }
-  if (
-    lower.startsWith('http:') ||
-    lower.startsWith('https:') ||
-    lower.startsWith('ftp:')
-  ) {
-    return { mode: 'links', url }
-  }
-  return null
+  const normalized = normalizeResourceUriLine(url)
+  return isDownloadableResourceUri(normalized)
+    ? { mode: 'links', url: normalized }
+    : null
 }
 
 export function createProtocolManager(deps: ProtocolManagerDeps) {
@@ -128,12 +122,10 @@ export function createProtocolManager(deps: ProtocolManagerDeps) {
       log.info({ url }, 'protocol url received')
       const lower = url.toLowerCase()
 
-      if (RESOURCE_PREFIXES.some((p) => lower.startsWith(p))) {
-        const params = uriToAddTaskParams(url)
-        if (params) {
-          log.info({ params }, 'opening add-task with prefill')
-          deps.onOpenAddTask(params)
-        }
+      const resourceParams = uriToAddTaskParams(url)
+      if (resourceParams) {
+        log.info({ params: resourceParams }, 'opening add-task with prefill')
+        deps.onOpenAddTask(resourceParams)
         return
       }
 

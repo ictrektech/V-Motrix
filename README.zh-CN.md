@@ -13,7 +13,7 @@
 
 ## 简介
 
-Motrix 是一款界面简洁、功能丰富的桌面下载管理器，可处理 HTTP、FTP、BitTorrent 和磁力链接（Magnet）等多种下载任务。
+Motrix 是一款界面简洁、功能丰富的桌面下载管理器，可处理 HTTP、HTTPS、FTP、SFTP、BitTorrent、磁力链接（Magnet）、Thunder 链接和裸 BitTorrent 信息哈希等多种下载任务。
 
 **Motrix Turbo** 是 Motrix 的 v2 版本。它保留了 v1 简洁易用的特点，并使用 Electron、React 和 TypeScript 重新开发。下载内核与界面相互独立；浏览器扩展和命令行工具通过开放协议 **MDXP**（Motrix Download eXchange Protocol，采用 JSON-RPC 2.0）与应用通信，插件则在独立的沙箱中运行。
 
@@ -61,7 +61,7 @@ Motrix Turbo v2 目前仍处于 beta 阶段。剩余发布门禁通过后，请�
 ## ✨ 主要功能
 
 - 🕹 简洁直观的图形界面，支持深色模式
-- 🦄 支持 BT 和磁力链接任务，可按需选择种子中的文件
+- 🦄 支持 BT、磁力链接和裸信息哈希任务，可按需选择种子中的文件
 - 📡 内置 Tracker 列表，可自动更新并检查可用性
 - 🔌 支持 UPnP 和 NAT-PMP 端口映射
 - 🚥 可限制上传和下载速度，并在多档限速模式之间切换
@@ -75,7 +75,7 @@ Motrix Turbo v2 目前仍处于 beta 阶段。剩余发布门禁通过后，请�
 - 🎬 URL Resolver 插件可解析站点媒体页面，并可扩展对更多站点的支持
 - 🤖 可驻留系统托盘，并支持开机自启动
 - 🌍 界面支持简体中文和英语，后续将加入更多语言
-- 🔗 注册 `motrix://` 和 `magnet:` 协议处理程序，并关联 `.torrent` 文件
+- 🔗 注册 `motrix://` 和 `magnet:` 协议处理程序，并关联 `.torrent` 文件；手动添加任务也支持 HTTP(S)、FTP、SFTP 和 Thunder 链接
 
 ## 🧩 周边生态
 

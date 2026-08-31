@@ -1,3 +1,7 @@
+import {
+  isDownloadableResourceUri,
+  normalizeResourceUriLine,
+} from '@shared/protocol/resource-uri'
 import type { InterpretResult, UrlInputInterpreter } from './types'
 
 export interface ParsedLine {
@@ -6,26 +10,13 @@ export interface ParsedLine {
   valid: boolean
 }
 
-const VALID_SCHEMES = ['http:', 'https:', 'ftp:']
-
 export function parseUrlLines(text: string): ParsedLine[] {
   const out: ParsedLine[] = []
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim()
-    if (trimmed === '') continue
-    let valid = false
-    if (trimmed.startsWith('magnet:')) {
-      valid = trimmed.startsWith('magnet:?')
-    } else {
-      try {
-        const u = new URL(trimmed)
-        valid = VALID_SCHEMES.includes(u.protocol)
-      } catch {
-        valid = false
-      }
-    }
-    out.push({ line: i, url: trimmed, valid })
+    const url = normalizeResourceUriLine(lines[i])
+    if (url === '') continue
+    out.push({ line: i, url, valid: isDownloadableResourceUri(url) })
   }
   return out
 }

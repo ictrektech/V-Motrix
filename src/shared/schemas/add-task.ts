@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  isDirectResourceUri,
+  isMagnetUri,
+  normalizeResourceUriLine,
+  splitResourceUriLines,
+} from '../protocol/resource-uri'
 
 const torrentFileSchema = z.object({
   index: z.number().int().nonnegative(),
@@ -72,7 +78,17 @@ const httpHeaderSchema = z.object({
 
 const httpTaskRequestSchema = z.object({
   type: z.literal('http'),
-  uris: z.array(z.url()).min(1),
+  uris: z
+    .array(
+      z
+        .string()
+        .trim()
+        .transform((value) => normalizeResourceUriLine(value))
+        .refine((value) => isDirectResourceUri(value), {
+          message: 'task.add.errors.invalidUrl',
+        })
+    )
+    .min(1),
   saveDir: z.string().min(1),
   filename: z.string().optional(),
   connections: z.number().int().min(1).max(128).optional(),
@@ -210,18 +226,12 @@ function compactHeader(name: string, value?: string) {
   return v ? [{ name, value: v }] : []
 }
 
-function splitUrlLines(raw: string): string[] {
-  return raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
-}
-
 /**
  * One request per pasted link line. Each line is an independent download —
- * a magnet line becomes its own bt request, everything else an http request
- * with the shared advanced options. The filename override only applies when
- * exactly one line is present (the same name on several tasks would collide).
+ * magnet and bare info-hash lines become their own bt requests, thunder lines
+ * are decoded to their underlying URI first, and direct resource links stay
+ * on the shared addUri path. The filename override only applies when exactly
+ * one line is present (the same name on several tasks would collide).
  * Mirror semantics (several uris feeding one task) remain available to API
  * callers via the singular converter below.
  */
@@ -229,7 +239,7 @@ export function formValuesToTaskCreateRequests(
   v: AddTaskFormValues
 ): TaskCreateRequest[] {
   if (v.tab !== 'links') return [formValuesToTaskCreateRequest(v)]
-  const lines = splitUrlLines(v.urls)
+  const lines = splitResourceUriLines(v.urls)
   const filename = lines.length === 1 ? v.filename : undefined
   return lines.map((line) =>
     formValuesToTaskCreateRequest({ ...v, urls: line, filename })
@@ -240,8 +250,8 @@ export function formValuesToTaskCreateRequest(
   v: AddTaskFormValues
 ): TaskCreateRequest {
   if (v.tab === 'links') {
-    const uris = splitUrlLines(v.urls)
-    if (uris.length === 1 && uris[0]?.startsWith('magnet:?')) {
+    const uris = splitResourceUriLines(v.urls)
+    if (uris.length === 1 && uris[0] && isMagnetUri(uris[0])) {
       return {
         type: 'bt',
         payload: { kind: 'magnet', uri: uris[0] },

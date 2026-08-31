@@ -48,3 +48,12 @@ process. Request/response and WebSocket boundaries map the private physical
 download root to `/downloads`, so the default path never reveals the subject
 hash, username, or host storage path. Browser localStorage, sessionStorage,
 and IndexedDB are partitioned by the same opaque namespace.
+
+## Supported input protocols
+
+Manual task creation accepts HTTP(S), FTP, SFTP, magnet links, Thunder links,
+and bare BitTorrent info hashes. Thunder links are decoded before submission,
+and bare info hashes are converted to magnet links. ED2K native downloading
+requires an ED2K-capable aria2 engine; the current VOS image uses the
+aria2-motrix engine, so ED2K UI exposure is intentionally kept behind the
+engine-upgrade boundary.

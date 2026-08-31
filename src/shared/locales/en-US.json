@@ -837,6 +837,7 @@
       },
       "errors": {
         "urlsRequired": "At least one URL is required",
+        "invalidUrl": "URL must be http, https, ftp, sftp, magnet, thunder, or a BitTorrent info hash",
         "saveDirRequired": "Save directory is required",
         "noFilesSelected": "Select at least one file",
         "missingSource": "Torrent file or magnet link is required"

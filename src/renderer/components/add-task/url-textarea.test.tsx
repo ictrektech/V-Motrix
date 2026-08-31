@@ -59,6 +59,20 @@ describe('UrlTextarea', () => {
     expect(screen.getByText(/1 invalid/i)).toBeInTheDocument()
   })
 
+  it('counts Motrix Next resource forms as valid URLs', async () => {
+    const user = userEvent.setup()
+    render(
+      <Wrapper>
+        <UrlTextarea name="urls" />
+      </Wrapper>
+    )
+    await user.type(
+      screen.getByRole('textbox'),
+      'sftp://example.com/a{Enter}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    )
+    expect(screen.getByText(/2 URLs/i)).toBeInTheDocument()
+  })
+
   // Plain URL pastes are handled natively — the onPaste handler only
   // intercepts when the interpreter has side effects (magnet/curl).
   // These tests verify the native behavior is no longer swallowed.

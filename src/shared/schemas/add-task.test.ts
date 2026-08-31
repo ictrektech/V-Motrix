@@ -112,6 +112,47 @@ describe('taskCreateRequestSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('accepts Motrix Next direct resource protocols supported by the current engine', () => {
+    for (const uri of [
+      'ftp://example.com/file.zip',
+      'sftp://example.com/file.zip',
+    ]) {
+      const result = taskCreateRequestSchema.safeParse({
+        type: 'http',
+        uris: [uri],
+        saveDir: '/d',
+        headers: [],
+      })
+      expect(result.success).toBe(true)
+    }
+  })
+
+  it('rejects ED2K until the bundled engine supports it', () => {
+    const result = taskCreateRequestSchema.safeParse({
+      type: 'http',
+      uris: ['ed2k://|file|ubuntu.iso|1|0123456789abcdef0123456789abcdef|/'],
+      saveDir: '/d',
+      headers: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('normalizes thunder direct resources before validation', () => {
+    const result = taskCreateRequestSchema.safeParse({
+      type: 'http',
+      uris: [
+        `thunder://${Buffer.from('AAhttps://example.com/file.zipZZ', 'utf8')
+          .toString('base64')
+          .replace(/=+$/u, '')}`,
+      ],
+      saveDir: '/d',
+      headers: [],
+    })
+    expect(result.success).toBe(true)
+    if (!result.success || result.data.type !== 'http') return
+    expect(result.data.uris).toEqual(['https://example.com/file.zip'])
+  })
+
   it('rejects http request with empty uris', () => {
     const result = taskCreateRequestSchema.safeParse({
       type: 'http',
@@ -179,6 +220,37 @@ describe('formValuesToTaskCreateRequests', () => {
       payload: { kind: 'magnet', uri: magnet },
     })
     expect(reqs[1]).toMatchObject({ type: 'http', uris: ['https://c/d'] })
+  })
+
+  it('converts a bare BitTorrent info hash into a magnet task request', () => {
+    const hash = 'a'.repeat(40)
+    const reqs = formValuesToTaskCreateRequests({
+      tab: 'links',
+      urls: `${hash}\nhttps://c/d`,
+      saveDir: '/d',
+    })
+    expect(reqs[0]).toMatchObject({
+      type: 'bt',
+      payload: { kind: 'magnet', uri: `magnet:?xt=urn:btih:${hash}` },
+    })
+    expect(reqs[1]).toMatchObject({ type: 'http', uris: ['https://c/d'] })
+  })
+
+  it('decodes thunder lines before building task requests', () => {
+    const thunder = `thunder://${Buffer.from(
+      'AAftp://example.com/file.zipZZ',
+      'utf8'
+    )
+      .toString('base64')
+      .replace(/=+$/u, '')}`
+    const reqs = formValuesToTaskCreateRequests({
+      tab: 'links',
+      urls: thunder,
+      saveDir: '/d',
+    })
+    expect(reqs).toMatchObject([
+      { type: 'http', uris: ['ftp://example.com/file.zip'] },
+    ])
   })
 
   it('applies the filename override only for a single line', () => {
@@ -392,6 +464,18 @@ describe('formValuesToTaskCreateRequest', () => {
       dlLimit: undefined,
       ulLimit: undefined,
       seedRatio: undefined,
+    })
+  })
+
+  it('keeps sftp links on the direct resource path', () => {
+    const req = formValuesToTaskCreateRequest({
+      tab: 'links',
+      urls: 'sftp://example.com/file.zip',
+      saveDir: '/d',
+    })
+    expect(req).toMatchObject({
+      type: 'http',
+      uris: ['sftp://example.com/file.zip'],
     })
   })
 })

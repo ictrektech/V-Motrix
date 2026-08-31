@@ -29,6 +29,7 @@ import {
 import type { SettingsManager } from '@core/settings/settings-manager'
 import { INCOMPLETE_SUFFIX } from '@shared/constants/incomplete'
 import { AppError, ErrorCode } from '@shared/errors'
+import { isFtpFamilyUri, isHttpFamilyUri } from '@shared/protocol/resource-uri'
 import type {
   TaskCreateRequest,
   TaskCreateSuccessResult,
@@ -224,13 +225,16 @@ export async function handleCreateTask(
 ): Promise<TaskCreateSuccessResult> {
   const parsed = taskCreateRequestSchema.safeParse(rawRequest)
   if (parsed.success && parsed.data.type === 'http') {
-    const policy = deps.directResourceProxyPolicy
     // Cold-start waiting happens before taking the proxy read lease. Once the
     // lease is held, a later disconnect must fail fast instead of waiting on
     // a restart that belongs to a newer applied-route generation.
     if (deps.waitForEngineReady) {
       await deps.waitForEngineReady()
     }
+    if (!parsed.data.uris.every(isHttpFamilyUri)) {
+      return handleCreateTaskUnderAdmission(rawRequest, deps, opts)
+    }
+    const policy = deps.directResourceProxyPolicy
     // Keep a runtime guard for untyped composition code: missing policy
     // injection must disable metadata I/O instead of consulting newer,
     // potentially unapplied SettingsManager values.
@@ -529,6 +533,8 @@ async function handleCreateTaskUnderAdmission(
       params.filename = `${finalName}${INCOMPLETE_SUFFIX}`
     }
 
+    const directUrisAreHttp = req.uris.every(isHttpFamilyUri)
+
     // 3.4. Mux pre-resolve seam (desktop Add-Task path).
     // When both resolveToMux and dispatchMux are wired (bridge enabled +
     // youtube/bilibili URL), call the resolver BEFORE beforeCreate fires.
@@ -538,7 +544,7 @@ async function handleCreateTaskUnderAdmission(
     // On null (non-resolver URL, bridge disabled, plugin not enabled) → fall
     // through to the unchanged HTTP path. No try/catch here: the factory owns
     // error handling (returns null on failure).
-    if (deps.resolveToMux && deps.dispatchMux) {
+    if (directUrisAreHttp && deps.resolveToMux && deps.dispatchMux) {
       const uri = params.uris[0]
       if (uri) {
         const muxResult = await deps.resolveToMux(uri)
@@ -604,95 +610,100 @@ async function handleCreateTaskUnderAdmission(
     // metadata that will be committed in the same SQLite transaction as the
     // task row. Aborted chains skip the engine call entirely and surface
     // PluginRuntimeFault to the IPC caller.
-    log.info(
-      {
-        taskId,
-        hasOrchestrator: Boolean(deps.orchestrator),
-        reqType: req.type,
-        uris: req.uris,
-      },
-      'beforeCreate hook chain pre-check'
-    )
-    if (deps.orchestrator) {
-      const ctxDto: BeforeCreateHttpContextDTO = {
-        type: 'http',
-        sourceUrl: params.uris[0] ?? '',
-        uris: [...params.uris],
-        saveDir: effectiveSaveDir,
-        filename: desiredName,
-        connections: req.connections,
-        headers: req.headers.map((h) => ({ name: h.name, value: h.value })),
-        proxy: req.proxy,
-        createdBy: 'user',
-        requestedAt: now,
-      }
-      const result = await deps.orchestrator.runBeforeCreateHttp(ctxDto, taskId)
+    if (directUrisAreHttp) {
       log.info(
         {
           taskId,
-          aborted: result.aborted === true,
-          rewrittenUris: result.aborted ? undefined : result.final.uris,
-          contributors: result.aborted ? undefined : result.contributors,
+          hasOrchestrator: Boolean(deps.orchestrator),
+          reqType: req.type,
+          uris: req.uris,
         },
-        'beforeCreate hook chain result'
+        'beforeCreate hook chain pre-check'
       )
-      if (result.aborted) {
+      if (deps.orchestrator) {
+        const ctxDto: BeforeCreateHttpContextDTO = {
+          type: 'http',
+          sourceUrl: params.uris[0] ?? '',
+          uris: [...params.uris],
+          saveDir: effectiveSaveDir,
+          filename: desiredName,
+          connections: req.connections,
+          headers: req.headers.map((h) => ({ name: h.name, value: h.value })),
+          proxy: req.proxy,
+          createdBy: 'user',
+          requestedAt: now,
+        }
+        const result = await deps.orchestrator.runBeforeCreateHttp(
+          ctxDto,
+          taskId
+        )
+        log.info(
+          {
+            taskId,
+            aborted: result.aborted === true,
+            rewrittenUris: result.aborted ? undefined : result.final.uris,
+            contributors: result.aborted ? undefined : result.contributors,
+          },
+          'beforeCreate hook chain result'
+        )
+        if (result.aborted) {
+          await deps.auditLog?.log({
+            type: 'chain.abort',
+            hook: 'beforeCreate',
+            taskId,
+            reason: result.reason,
+          })
+          throw new AppError(
+            ErrorCode.PluginRuntimeFault,
+            `plugin chain aborted: ${result.reason}`
+          )
+        }
+        // Apply merged outputs back to the create params. mergeChain is
+        // well-defined for the slot keys we care about; absent keys keep
+        // the user's input intact. Conditionality matches the old code:
+        //   - uris: ALWAYS overwritten (the chain always produces a final set)
+        //   - headers: only when the chain produced headers (else keep req)
+        //   - proxy: TRUTHY check (an empty-string proxy must NOT overwrite)
+        params.uris = [...result.final.uris]
+        if (result.final.headers.length > 0) {
+          params.headers = Object.fromEntries(
+            result.final.headers.map((h) => [h.name, h.value])
+          )
+        }
+        if (result.final.proxy) {
+          params.proxy = result.final.proxy
+        }
+        // Always emit chain.commit on a successful chain — a chain that
+        // mutates only uris or proxy (no headers) still completes and
+        // deserves an audit trail. Matches the sibling site in finalizeTask.
         await deps.auditLog?.log({
-          type: 'chain.abort',
+          type: 'chain.commit',
           hook: 'beforeCreate',
           taskId,
-          reason: result.reason,
+          headerContributors: result.contributors.headers,
+          proxyContributor: result.contributors.proxy,
+          uriContributor: result.contributors.uris,
+          finalHeaderCount: result.final.headers.length,
         })
-        throw new AppError(
-          ErrorCode.PluginRuntimeFault,
-          `plugin chain aborted: ${result.reason}`
-        )
-      }
-      // Apply merged outputs back to the create params. mergeChain is
-      // well-defined for the slot keys we care about; absent keys keep
-      // the user's input intact. Conditionality matches the old code:
-      //   - uris: ALWAYS overwritten (the chain always produces a final set)
-      //   - headers: only when the chain produced headers (else keep req)
-      //   - proxy: TRUTHY check (an empty-string proxy must NOT overwrite)
-      params.uris = [...result.final.uris]
-      if (result.final.headers.length > 0) {
-        params.headers = Object.fromEntries(
-          result.final.headers.map((h) => [h.name, h.value])
-        )
-      }
-      if (result.final.proxy) {
-        params.proxy = result.final.proxy
-      }
-      // Always emit chain.commit on a successful chain — a chain that
-      // mutates only uris or proxy (no headers) still completes and
-      // deserves an audit trail. Matches the sibling site in finalizeTask.
-      await deps.auditLog?.log({
-        type: 'chain.commit',
-        hook: 'beforeCreate',
-        taskId,
-        headerContributors: result.contributors.headers,
-        proxyContributor: result.contributors.proxy,
-        uriContributor: result.contributors.uris,
-        finalHeaderCount: result.final.headers.length,
-      })
-      if (deps.db) {
-        const db = deps.db
-        pluginStaged = {
-          commit: (cb: () => void) =>
-            result.staged.commitMetadata(db, taskId, cb),
+        if (deps.db) {
+          const db = deps.db
+          pluginStaged = {
+            commit: (cb: () => void) =>
+              result.staged.commitMetadata(db, taskId, cb),
+          }
         }
       }
     }
 
     assertSupportedHttpTaskProxy(params.proxy)
 
-    const ambientMetadataProfile = metadataHeadersSupported
-      ? resolveDirectResourceMetadataProfile(deps.adapter)
+    const ambientMetadataProfile =
+      directUrisAreHttp && metadataHeadersSupported
+        ? resolveDirectResourceMetadataProfile(deps.adapter)
+        : null
+    const metadataRequestProfile = directUrisAreHttp
+      ? canApplyDirectResourceMetadataProfile(params, ambientMetadataProfile)
       : null
-    const metadataRequestProfile = canApplyDirectResourceMetadataProfile(
-      params,
-      ambientMetadataProfile
-    )
     if (metadataRequestProfile) {
       params.directResourceMetadataProfile = metadataRequestProfile
     }
@@ -746,9 +757,10 @@ async function handleCreateTaskUnderAdmission(
     // engine-call-only so credentials never enter motrix.db.
     directReplay = buildDirectReplayRecipe(
       params,
-      ambientMetadataProfile === null
+      directUrisAreHttp && ambientMetadataProfile === null
     )
     if (
+      directUrisAreHttp &&
       directReplay.replayability === 'uri-only' &&
       metadataRequestProfile !== null &&
       deps.directResourceValidator &&
@@ -1059,7 +1071,10 @@ async function handleCreateTaskUnderAdmission(
 // ─── Helpers ──────────────────────────────────────────────────
 
 function deriveTaskType(req: TaskCreateRequest): TaskType {
-  if (req.type === 'http') return TaskType.Http
+  if (req.type === 'http') {
+    const firstUri = req.uris[0]
+    return firstUri && isFtpFamilyUri(firstUri) ? TaskType.Ftp : TaskType.Http
+  }
   return req.payload.kind === 'magnet' ? TaskType.Magnet : TaskType.Bt
 }
 

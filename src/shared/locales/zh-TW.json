@@ -825,6 +825,7 @@
       },
       "errors": {
         "urlsRequired": "至少需要一個 URL",
+        "invalidUrl": "URL 必須是 http、https、ftp、sftp、magnet、thunder 或 BitTorrent 資訊雜湊",
         "saveDirRequired": "必須指定儲存目錄",
         "noFilesSelected": "至少選擇一個檔案",
         "missingSource": "必須提供 Torrent 檔案或 Magnet 連結"

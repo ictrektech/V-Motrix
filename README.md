@@ -13,7 +13,7 @@ English | [简体中文](./README.zh-CN.md)
 
 ## Overview
 
-Motrix is a clean, full-featured desktop download manager for HTTP, FTP, BitTorrent, magnet links, and more.
+Motrix is a clean, full-featured desktop download manager for HTTP, HTTPS, FTP, SFTP, BitTorrent, magnet links, Thunder links, bare BitTorrent info hashes, and more.
 
 **Motrix Turbo** is Motrix v2, rebuilt from the ground up with Electron, React, and TypeScript while keeping the clean, straightforward experience of v1. The download core is independent of the UI. Browser extensions and command-line tools communicate with the app over **MDXP** (Motrix Download eXchange Protocol), an open protocol built on JSON-RPC 2.0, while plugins run in isolated sandboxes.
 
@@ -63,7 +63,7 @@ account, machine, or Docker data directory.
 ## ✨ Features
 
 - 🕹 Clean, intuitive interface with dark mode
-- 🦄 BitTorrent downloads with per-file selection, plus magnet link support
+- 🦄 BitTorrent downloads with per-file selection, magnet links, and bare info-hash input
 - 📡 Built-in tracker list management with automatic updates and health checks
 - 🔌 UPnP and NAT-PMP port mapping
 -  🚥  Upload and download limits with multiple speed-limit profiles
@@ -77,7 +77,7 @@ account, machine, or Docker data directory.
 -  🎬  Extensible URL Resolver plugins for extracting media from supported sites
 -  🤖  System tray integration and launch at startup
 -  🌍  Simplified Chinese and English UI, with more languages planned
--  🔗  Handlers for `motrix://` and `magnet:` links, plus `.torrent` file associations
+-  🔗  Handlers for `motrix://` and `magnet:` links, plus `.torrent` file associations; manual tasks also accept HTTP(S), FTP, SFTP, and Thunder links
 
 ## 🧩 Ecosystem
 
