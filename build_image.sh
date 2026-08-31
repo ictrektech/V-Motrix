@@ -8,7 +8,7 @@ BASE_SOURCE="docker.m.daocloud.io/library/node:24-alpine"
 SPREADSHEET_TOKEN="${FEISHU_SPREADSHEET_TOKEN:-Htotsn3oahO1zxt73YMcaB1zn8e}"
 if [[ -z "${FEISHU_CONFIG_FILE:-}" ]]; then
   for candidate in "${HOME}/.feishu.components.json" "${HOME}/.feishu.json"; do
-    if [[ -r "$candidate" ]]; then
+    if [[ -s "$candidate" ]]; then
       FEISHU_CONFIG_FILE="$candidate"
       break
     fi
