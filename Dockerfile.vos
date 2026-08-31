@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 ARG NODE_IMAGE
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 FROM ${NODE_IMAGE} AS deps
+ARG NPM_REGISTRY
 
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
@@ -8,7 +10,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY packages/native-host/package.json ./packages/native-host/package.json
 COPY scripts/postinstall.mjs scripts/fetch-engine.mjs ./scripts/
 ENV MOTRIX_SKIP_ELECTRON_REBUILD=1 \
-    MOTRIX_SKIP_ENGINE_FETCH=1
+    MOTRIX_SKIP_ENGINE_FETCH=1 \
+    COREPACK_NPM_REGISTRY=${NPM_REGISTRY} \
+    npm_config_registry=${NPM_REGISTRY}
 RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
     corepack enable \
  && corepack prepare pnpm@11.22.0 --activate \
@@ -16,6 +20,7 @@ RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
  && pnpm install --frozen-lockfile
 
 FROM ${NODE_IMAGE} AS production-deps
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
@@ -23,7 +28,9 @@ COPY packages/native-host/package.json ./packages/native-host/package.json
 COPY scripts/postinstall.mjs scripts/fetch-engine.mjs ./scripts/
 ENV CI=true \
     MOTRIX_SKIP_ELECTRON_REBUILD=1 \
-    MOTRIX_SKIP_ENGINE_FETCH=1
+    MOTRIX_SKIP_ENGINE_FETCH=1 \
+    COREPACK_NPM_REGISTRY=${NPM_REGISTRY} \
+    npm_config_registry=${NPM_REGISTRY}
 RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
     corepack enable \
  && corepack prepare pnpm@11.22.0 --activate \
