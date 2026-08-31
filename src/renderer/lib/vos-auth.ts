@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha2.js'
+import { resolveWebBase } from './web-base'
 
 export interface VosSessionUser {
   username: string
@@ -29,7 +30,7 @@ declare global {
   }
 }
 
-const base = `${globalThis.location?.origin ?? ''}${import.meta.env.BASE_URL.replace(/\/$/, '')}`
+const base = resolveWebBase()
 
 function randomBytes(length = 32): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(length))

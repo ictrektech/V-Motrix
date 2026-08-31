@@ -43,7 +43,6 @@ RUN --mount=type=cache,id=v-motrix-pnpm-store,target=/pnpm/store \
 
 FROM deps AS build
 ARG TARGETARCH
-ARG VOS_BASE_PATH=/app/com.ictrek.v-motrix/
 WORKDIR /app
 COPY . .
 RUN ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
@@ -57,7 +56,7 @@ RUN --mount=type=cache,id=v-motrix-builtins,target=/app/node_modules/.cache/motr
  && MOTRIX_ENGINE_FETCH_TIMEOUT_MS=120000 \
     node scripts/fetch-engine.mjs --platform linux --arch "${engine_arch}" \
  && pnpm run check:third-party-notices \
- && MOTRIX_WEB_BASE_PATH="${VOS_BASE_PATH}" pnpm run build:server \
+ && MOTRIX_WEB_BASE_PATH=./ pnpm run build:server \
  && node scripts/stage-server-app.mjs --platform linux --arch "${TARGETARCH}" --libc gnu --strict \
  && node scripts/verify-server-package.mjs --app-dir dist/server-app --platform linux --arch "${TARGETARCH}" --libc gnu \
  && dist/server-app/bin/aria2c --version

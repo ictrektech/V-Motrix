@@ -7,7 +7,9 @@
  * them (it uses IPC).
  */
 
-const base = `${globalThis.location?.origin ?? ''}${import.meta.env.BASE_URL.replace(/\/$/, '')}`
+import { resolveWebBase } from './web-base'
+
+const base = resolveWebBase()
 
 export async function getOperatorStatus(): Promise<boolean> {
   try {
