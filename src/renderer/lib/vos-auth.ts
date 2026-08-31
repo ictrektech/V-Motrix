@@ -27,6 +27,11 @@ declare global {
     vos_platform?: {
       api?: { v1000?: { oauth2?: VosOAuth2 } }
     }
+    __VOS_APP_CONTEXT__?: {
+      accessToken?: string
+      token?: string
+    }
+    __VOS_ACCESS_TOKEN__?: string
   }
 }
 
@@ -64,6 +69,60 @@ async function currentSession(): Promise<SessionResponse> {
   if (!contentType.includes('application/json')) return { enabled: false }
   const payload = (await response.json()) as SessionResponse
   return response.ok ? payload : { enabled: false }
+}
+
+function tokenFromAccessStore(raw: string | null): string | null {
+  if (!raw) return null
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>
+    const token = data.accessToken || data.access_token || data.token
+    return typeof token === 'string' && token.trim() ? token.trim() : null
+  } catch {
+    return null
+  }
+}
+
+function tokenFromLocalStorage(): string | null {
+  try {
+    const directKeys = ['core-access', 'VIVIBIT-core-access']
+    for (const key of directKeys) {
+      const token = tokenFromAccessStore(localStorage.getItem(key))
+      if (token) return token
+    }
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key?.endsWith('-core-access')) continue
+      const token = tokenFromAccessStore(localStorage.getItem(key))
+      if (token) return token
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function tokenFromInjectedContext(): string | null {
+  const token =
+    window.__VOS_APP_CONTEXT__?.accessToken ||
+    window.__VOS_APP_CONTEXT__?.token ||
+    window.__VOS_ACCESS_TOKEN__
+  return typeof token === 'string' && token.trim() ? token.trim() : null
+}
+
+async function loginWithAccessToken(
+  accessToken: string
+): Promise<VosSessionUser | null> {
+  const response = await fetch(`${base}/api/vos/auth/login`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ access_token: accessToken }),
+  })
+  const payload = (await response.json()) as SessionResponse & {
+    error?: string
+  }
+  if (!response.ok || !payload.user) return null
+  return payload.user
 }
 
 async function exchangeFastpath(
@@ -119,6 +178,11 @@ export async function bootstrapVosSession(): Promise<VosSessionUser | null> {
   if (!config.enabled) return null
   const bridge = await oauth2Bridge()
   if (bridge) return exchangeFastpath(config, bridge)
+  const directToken = tokenFromInjectedContext() || tokenFromLocalStorage()
+  if (directToken) {
+    const user = await loginWithAccessToken(directToken)
+    if (user) return user
+  }
   if (config.authenticated && config.user) return config.user
   throw new Error('VOS OIDC Fastpath is unavailable')
 }

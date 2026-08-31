@@ -55,4 +55,53 @@ describe('bootstrapVosSession', () => {
       expect.objectContaining({ code_verifier: expect.any(String) })
     )
   })
+
+  it('falls back to the VOS shell access token when Fastpath is not injected', async () => {
+    const values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      get length() {
+        return values.size
+      },
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => Array.from(values.keys())[index] ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+      clear: () => values.clear(),
+    })
+    globalThis.localStorage.setItem(
+      'core-access',
+      JSON.stringify({ accessToken: 'shell-access-token' })
+    )
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          enabled: true,
+          clientId: 'com.ictrek.v-motrix',
+          scope: 'openid profile email',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: { username: 'alice', namespace: 'b'.repeat(40) },
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(bootstrapVosSession()).resolves.toEqual({
+      username: 'alice',
+      namespace: 'b'.repeat(40),
+    })
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringMatching(/\/api\/vos\/auth\/login$/),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ access_token: 'shell-access-token' }),
+      })
+    )
+  })
 })

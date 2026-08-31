@@ -13,7 +13,7 @@ routers:
           zh-CN: 下载管理
           en: Downloads
         icon: lucide:circle-arrow-down
-        iframe-src: /app/com.ictrek.v-motrix/
+        iframe-src: /app/com.ictrek.v-motrix/#/downloads
         order: 10
         keep-alive: true
         entry-point: true

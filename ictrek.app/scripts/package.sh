@@ -43,10 +43,10 @@ PY
 
 APP_TARBALL="${DIST_DIR}/app.tar.gz"
 PACKAGE_PATH="${DIST_DIR}/${APP_NAME}_${APP_VERSION}_pull.tar"
-tar czf "$APP_TARBALL" -C "$STAGE_DIR" \
+COPYFILE_DISABLE=1 tar czf "$APP_TARBALL" -C "$STAGE_DIR" \
   .env manifest.yml docker-compose.yml configs.yml routers.yml icon.png README.zh-CN.md README.en.md
 cp "$APP_TARBALL" "$PACKAGE_ROOT/app.tar.gz"
-tar cf "$PACKAGE_PATH" -C "$PACKAGE_ROOT" app.tar.gz
+COPYFILE_DISABLE=1 tar cf "$PACKAGE_PATH" -C "$PACKAGE_ROOT" app.tar.gz
 
 python3 - "$PACKAGE_PATH" "$APP_TARBALL" "$APP_ID" <<'PY'
 import io, re, sys, tarfile
@@ -76,7 +76,7 @@ with tarfile.open(inner_path, 'r:gz') as inner:
         ('HeaderRegexp(`Sec-Fetch-Dest`, `document`)', compose),
         (f'basePath: /app/{app_id}', manifest), ('oauth2:', manifest),
         ('storage:', manifest), ('id: com-ictrek-v-motrix', routers),
-        ('id: downloads', routers), (f'iframe-src: /app/{app_id}/', routers),
+        ('id: downloads', routers), (f'iframe-src: /app/{app_id}/#/downloads', routers),
         ('entry-point: true', routers), ('embed: true', routers),
     ]
     for needle, haystack in checks:
