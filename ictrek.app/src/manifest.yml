@@ -39,6 +39,8 @@ profiles:
     description:
       zh-CN: x86_64 / AMD64 平台。
       en: x86_64 / AMD64 platform.
+    caps:
+      arch: amd64
     conflicts: [arm]
   - name: arm
     title:
@@ -47,6 +49,8 @@ profiles:
     description:
       zh-CN: ARM64 平台。
       en: ARM64 platform.
+    caps:
+      arch: arm64
     conflicts: [amd]
 
 require-profiles: true
