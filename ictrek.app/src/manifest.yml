@@ -49,6 +49,8 @@ profiles:
       en: ARM64 platform.
     conflicts: [amd]
 
+require-profiles: true
+
 storage:
   directories:
     - path: data
