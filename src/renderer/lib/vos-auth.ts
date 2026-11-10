@@ -273,7 +273,10 @@ export function installVosStoragePartition(namespace: string): void {
     throw new Error('Invalid VOS storage namespace')
   }
   const prefix = `v-motrix:${namespace}:`
-  installProperty('localStorage', scopedStorage(browserStorage('localStorage'), prefix))
+  installProperty(
+    'localStorage',
+    scopedStorage(browserStorage('localStorage'), prefix)
+  )
   installProperty(
     'sessionStorage',
     scopedStorage(browserStorage('sessionStorage'), prefix)

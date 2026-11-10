@@ -282,3 +282,9 @@ All participants must follow the [Code of Conduct](./CODE_OF_CONDUCT.md). Report
 
 See [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) for third-party license information.
 Release packages also include a generated dependency inventory, consolidated license texts, and an SPDX 2.3 SBOM under `legal/`.
+
+## VOS API reference
+
+The VOS API Guide page exposes [workflows and native field contracts](ictrek.app/docs/api-reference.en.md), including VOS identity, per-user runtime isolation, native RPC, events, task cancellation/file deletion and staged plugin uploads. `/api-guide.html` includes searchable field expansion and `/vos-api-contract.json`; source updates ship in the next VOS release.
+
+Regenerate native handler metadata on a build host with `node --import tsx scripts/generate-vos-api.mjs --compiler <classic-typescript-5.9/lib/typescript.js>`. The dedicated documentation compiler reads source types only; the project keeps its native TypeScript7 checker. Runtime Zod refinements and engine availability remain authoritative.

@@ -18,3 +18,14 @@ routers:
         keep-alive: true
         entry-point: true
         embed: true
+      - id: api-docs
+        kind: page
+        title:
+          zh-CN: API 接入指南
+          en: API Guide
+        icon: lucide:book-open
+        iframe-src: /app/com.ictrek.v-motrix/api-guide.html
+        order: 20
+        keep-alive: true
+        entry-point: true
+        embed: true

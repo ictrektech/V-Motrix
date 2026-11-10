@@ -164,8 +164,22 @@ function userFromVosCheckPayload(payload: unknown): VosUser {
     claim(data, 'sub', 'id', 'user_id', 'uid') ||
     claim(outer, 'sub', 'id', 'user_id', 'uid')
   const username =
-    claim(user, 'preferred_username', 'username', 'name', 'nickname', 'email') ||
-    claim(data, 'preferred_username', 'username', 'name', 'nickname', 'email') ||
+    claim(
+      user,
+      'preferred_username',
+      'username',
+      'name',
+      'nickname',
+      'email'
+    ) ||
+    claim(
+      data,
+      'preferred_username',
+      'username',
+      'name',
+      'nickname',
+      'email'
+    ) ||
     claim(outer, 'preferred_username', 'username', 'name', 'nickname', 'email')
   return userFromPayload({ sub: subject, preferred_username: username })
 }
@@ -367,13 +381,9 @@ async function startChild(user: VosUser): Promise<ChildRuntime> {
   )
   await mkdir(downloads, { recursive: true, mode: 0o755 })
   const operatorToken = randomBytes(32).toString('base64url')
-  const [aria2RpcPort, listenPort, dhtListenPort, mdxpPort] =
-    await Promise.all([
-      reserveTcpPort(),
-      reserveTcpPort(),
-      reserveTcpPort(),
-      reserveTcpPort(),
-    ])
+  const [aria2RpcPort, listenPort, dhtListenPort, mdxpPort] = await Promise.all(
+    [reserveTcpPort(), reserveTcpPort(), reserveTcpPort(), reserveTcpPort()]
+  )
   const child = spawn(process.execPath, [serverEntry], {
     env: {
       ...process.env,

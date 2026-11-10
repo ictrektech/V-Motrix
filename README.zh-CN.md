@@ -264,3 +264,9 @@ Electron 桌面应用和 Node headless 服务端共用同一个 core。通知、
 
 第三方组件许可信息见 [`THIRD_PARTY_NOTICES.zh-CN.md`](./THIRD_PARTY_NOTICES.zh-CN.md)。
 正式安装包还会在 `legal/` 目录中提供自动生成的依赖清单、许可证全文汇总和 SPDX 2.3 SBOM。
+
+## VOS API 参考
+
+VOS 中的 API 接入指南提供[完整流程与原生字段契约](ictrek.app/docs/api-reference.zh.md)，涵盖 VOS 身份、逐用户实例隔离、原生 RPC、事件、任务取消与文件删除，以及插件暂存。`/api-guide.html` 可搜索并展开字段，原始契约为 `/vos-api-contract.json`；本轮只更新源码，随 VOS 应用下次发版交付。
+
+在构建机运行 `node --import tsx scripts/generate-vos-api.mjs --compiler <classic-typescript-5.9/lib/typescript.js>` 重新生成原生处理器元数据。独立文档编译器只读取源类型，不替换项目的原生 TypeScript7 检查器；运行时 Zod 细化校验与引擎能力仍然有效。
